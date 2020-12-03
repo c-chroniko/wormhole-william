@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cheggaaa/pb/v3"
 	"github.com/psanford/wormhole-william/wormhole"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +52,6 @@ func sendCommand() *cobra.Command {
 	cmd.Flags().IntVarP(&codeLen, "code-length", "c", 0, "length of code (in bytes/words)")
 	cmd.Flags().StringVar(&codeFlag, "code", "", "human-generated code phrase")
 	cmd.Flags().StringVar(&sendTextFlag, "text", "", "text message to send, instead of a file.\nUse '-' to read from stdin")
-	cmd.Flags().BoolVar(&hideProgressBar, "hide-progress", false, "suppress progress-bar display")
 
 	return &cmd
 }
@@ -102,24 +100,8 @@ func sendFile(filename string) {
 
 	ctx := context.Background()
 
-	var bar *pb.ProgressBar
-
 	args := []wormhole.SendOption{
 		wormhole.WithCode(codeFlag),
-	}
-
-	if !hideProgressBar {
-		args = append(args, wormhole.WithProgress(func(sentBytes int64, totalBytes int64) {
-			if bar == nil {
-				bar = pb.Full.Start64(totalBytes)
-				bar.Set(pb.Bytes, true)
-			}
-			bar.SetCurrent(sentBytes)
-
-			if sentBytes == totalBytes {
-				bar.Finish()
-			}
-		}))
 	}
 
 	code, status, err := c.SendFile(ctx, filepath.Base(filename), f, args...)

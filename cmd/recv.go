@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cheggaaa/pb/v3"
 	"github.com/psanford/wormhole-william/wormhole"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +25,6 @@ func recvCommand() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&verify, "verify", "v", false, "display verification string (and wait for approval)")
-	cmd.Flags().BoolVar(&hideProgressBar, "hide-progress", false, "suppress progress-bar display")
 
 	return &cmd
 }
@@ -266,25 +264,6 @@ func formatBytes(b int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "kMGTPE"[exp])
 }
 
-type proxyReadCloser struct {
-	*pb.Reader
-	bar *pb.ProgressBar
-}
-
-func (p *proxyReadCloser) Close() error {
-	p.bar.Finish()
-	return nil
-}
-
 func pbProxyReader(r io.Reader, size int64) io.ReadCloser {
-	if hideProgressBar {
-		return ioutil.NopCloser(r)
-	} else {
-		progressBar := pb.Full.Start64(size)
-		proxyReader := progressBar.NewProxyReader(r)
-		return &proxyReadCloser{
-			Reader: proxyReader,
-			bar:    progressBar,
-		}
-	}
+	return ioutil.NopCloser(r)
 }
