@@ -1,1 +1,4 @@
 release/
+*.wasm
+wasm_server/wasm_exec.js
+wasm_server/wasmsrv
