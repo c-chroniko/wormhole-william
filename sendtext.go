@@ -5,7 +5,8 @@ import (
 	"strings"
 	"log"
 	"context"
-	
+	"syscall/js"
+
 	"github.com/psanford/wormhole-william/wormhole"
 )
 
@@ -46,8 +47,20 @@ func newClient() wormhole.Client {
 
 func printInstructions(code string) {
 	mwCmd := "wormhole receive"
-	wwCmd := "wormhole-william recv"
 
-	fmt.Printf("On the other computer, please run: %s (or %s)\n", mwCmd, wwCmd)
-	fmt.Printf("Wormhole code is: %s\n", code)
+	t1 := fmt.Sprintf("On the other computer, please run: %s\n", mwCmd)
+	t2 := fmt.Sprintf("Wormhole code is: %s\n", code)
+
+	jsDoc := js.Global().Get("document")
+	if !jsDoc.Truthy() {
+		return
+	}
+
+	outputArea1 := jsDoc.Call("createElement", "p")
+	outputArea1.Set("innerHTML", t1)
+	jsDoc.Get("body").Call("appendChild", outputArea1)
+
+	outputArea2 := jsDoc.Call("createElement", "p")
+	outputArea2.Set("innerHTML", t2)
+	jsDoc.Get("body").Call("appendChild", outputArea2)
 }
