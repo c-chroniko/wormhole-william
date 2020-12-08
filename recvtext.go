@@ -19,14 +19,13 @@ func RecvText(code string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("returned")
 	switch msg.Type {
 	case wormhole.TransferText:
 		body, err := ioutil.ReadAll(msg)
 		if err != nil {
 			log.Fatal(err)
 		}
-
+		fmt.Println(string(body))
 		return string(body)
 	default:
 		return "unsupported transfer type"
