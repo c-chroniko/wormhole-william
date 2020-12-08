@@ -15,7 +15,7 @@ func sendText() js.Func {
 		input := args[0].String()
 		go SendText(input)
 
-		return 0
+		return nil
 	})
 
 	return sendTextFunc
