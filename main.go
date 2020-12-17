@@ -1,53 +1,52 @@
 package main
 
 import (
-    "fmt"
 	"syscall/js"
 )
 
-func sendText() js.Func {
-	// interface{} can return anything and Go being like C,
-	// different paths can return different values! :-(
-	var sendTextFunc = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		if len(args) != 1 {
-			return "Invalid number of arguments"
-		}
+// interface{} can return anything and Go being like C,
+// different paths can return different values! :-(
+func sendText(this js.Value, args []js.Value) interface{} {
+    if len(args) != 2 {
+        return "Invalid number of arguments"
+    }
 
-		input := args[0].String()
-		var code string
-		go func() {
-            code = SendText(input)
-		}()
+    input := args[0].String()
+    promise := args[1]
+    var code string
+    var reject = func(err error) {
+        promise.Call("reject", err.Error())
+    }
+    go func() {
+        code = SendText(input, reject)
+        promise.Call("resolve", code)
+    }()
 
-		fmt.Printf("main code: %s\n", code)
-
-		return code
-	})
-
-	return sendTextFunc
+    return code
 }
 
-func recvText() js.Func {
-	var recvTextFunc = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		if len(args) != 1 {
-			return "Invalid number of arguments"
-		}
+func recvText(this js.Value, args []js.Value) interface{} {
+    if len(args) != 2 {
+        return "Invalid number of arguments"
+    }
 
-		code := args[0].String()
-		var output string
-		go func() {
-			output = RecvText(code)
-		}()
+    code := args[0].String()
+    promise := args[1]
+    var output string
+    var reject = func(err error) {
+        promise.Call("reject", err.Error())
+    }
+    go func() {
+        output = RecvText(code, reject)
+        promise.Call("resolve", output)
+    }()
 
-		return output
-	})
-
-	return recvTextFunc
+    return output
 }
 
 func main() {
 	// make sendText and recvText available in JS
-	js.Global().Set("sendText", sendText())
-	js.Global().Set("recvText", recvText())
+	js.Global().Set("sendText", js.FuncOf(sendText))
+	js.Global().Set("recvText", js.FuncOf(recvText))
 	<-make(chan bool)
 }
