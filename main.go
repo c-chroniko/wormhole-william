@@ -1,6 +1,7 @@
 package main
 
 import (
+    "fmt"
 	"syscall/js"
 )
 
@@ -13,9 +14,14 @@ func sendText() js.Func {
 		}
 
 		input := args[0].String()
-		go SendText(input)
+		var code string
+		go func() {
+            code = SendText(input)
+		}()
 
-		return nil
+		fmt.Printf("main code: %s\n", code)
+
+		return code
 	})
 
 	return sendTextFunc

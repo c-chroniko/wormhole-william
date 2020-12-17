@@ -4,7 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"log"
-	"syscall/js"
+// 	"syscall/js"
 
 	"github.com/psanford/wormhole-william/wormhole"
 )
@@ -25,20 +25,8 @@ func RecvText(code string) string {
 		if err != nil {
 			log.Fatal(err)
 		}
-		printTextMessage(string(body))
 		return string(body)
 	default:
 		return "unsupported transfer type"
 	}
-}
-
-func printTextMessage(msg string) {
-	jsDoc := js.Global().Get("document")
-	if !jsDoc.Truthy() {
-		return
-	}
-
-	outputMsgArea := jsDoc.Call("createElement", "p")
-	outputMsgArea.Set("innerHTML", msg)
-	jsDoc.Get("body").Call("appendChild", outputMsgArea)
 }
