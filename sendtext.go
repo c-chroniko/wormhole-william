@@ -1,15 +1,15 @@
 package main
 
 import (
+    "fmt"
 	"strings"
-// 	"log"
 	"context"
-// 	"syscall/js"
 
 	"github.com/psanford/wormhole-william/wormhole"
 )
 
 func SendText(message string, reject func(error)) string {
+	fmt.Println("SendText")
 	c := newClient()
 
 	var msg string
@@ -17,26 +17,25 @@ func SendText(message string, reject func(error)) string {
 
 	ctx := context.Background()
 	codeFlag := ""
-//   	code, status, err := c.SendText(ctx, msg, wormhole.WithCode(codeFlag))
-  	code, _, err := c.SendText(ctx, msg, wormhole.WithCode(codeFlag))
+  	code, status, err := c.SendText(ctx, msg, wormhole.WithCode(codeFlag))
+	fmt.Println("msg sent")
 	if err != nil {
+        fmt.Println("rejecting after c.SendText")
 	    reject(err)
 	    return ""
 	}
 
-//     go func() {
-//         s := <-status
-//
-//         if s.Error != nil {
-//             log.Fatalf("Send error: %s", s.Error)
-//         } else if s.OK {
-//             fmt.Println("text message sent")
-//         } else {
-//             log.Fatalf("Hmm not ok but also not error")
-//         }
-//     }()
+    go func() {
+        fmt.Println("reading from status")
+        s := <-status
 
-    return code;
+        if s.Error != nil {
+            fmt.Println("rejecting with s.Error")
+            reject(err)
+        }
+    }()
+
+    return code
 }
 
 func newClient() wormhole.Client {

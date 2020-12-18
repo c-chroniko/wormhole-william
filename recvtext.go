@@ -2,22 +2,23 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
-// 	"log"
-// 	"syscall/js"
 
 	"github.com/psanford/wormhole-william/wormhole"
 )
 
 // Code -> Text message
 func RecvText(code string, reject func(error)) string {
+    fmt.Println("RecvText")
 	var c = newClient()
 	var ctx = context.Background()
 
 	// todo: verifier support
 	msg, err := c.Receive(ctx, code)
+	fmt.Println("msg received")
 	if err != nil {
-// 		log.Fatal(err)
+        fmt.Println("rejecting after c.Receive")
         reject(err)
         return ""
 	}
@@ -25,12 +26,15 @@ func RecvText(code string, reject func(error)) string {
 	case wormhole.TransferText:
 		body, err := ioutil.ReadAll(msg)
 		if err != nil {
-// 			log.Fatal(err)
+            fmt.Println("rejecting after ioutil.ReadAll")
             reject(err)
             return ""
 		}
-		return string(body)
+
+        return string(body)
 	default:
-		return "unsupported transfer type"
+        fmt.Println("rejecting unsupported transfer type")
+		reject(fmt.Errorf("unsupported transfer type"))
+		return ""
 	}
 }

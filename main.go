@@ -13,16 +13,14 @@ func sendText(this js.Value, args []js.Value) interface{} {
 
     input := args[0].String()
     promise := args[1]
-    var code string
     var reject = func(err error) {
         promise.Call("reject", err.Error())
     }
     go func() {
-        code = SendText(input, reject)
+        code := SendText(input, reject)
         promise.Call("resolve", code)
     }()
-
-    return code
+    return nil
 }
 
 func recvText(this js.Value, args []js.Value) interface{} {
@@ -32,16 +30,14 @@ func recvText(this js.Value, args []js.Value) interface{} {
 
     code := args[0].String()
     promise := args[1]
-    var output string
     var reject = func(err error) {
         promise.Call("reject", err.Error())
     }
     go func() {
-        output = RecvText(code, reject)
+        output := RecvText(code, reject)
         promise.Call("resolve", output)
     }()
-
-    return output
+    return nil
 }
 
 func main() {
