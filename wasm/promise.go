@@ -14,7 +14,6 @@ type PromiseFn = func(ResolveFn, RejectFn)
 
 func NewPromise(fn PromiseFn) *Promise {
 	constructor := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		//fmt.Println("promise constructor called!")
 		// TODO: error handling!!!
 		obj := js.Global().Get("Object").New()
 		obj.Set("resolve", args[0])
