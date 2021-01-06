@@ -330,13 +330,18 @@ func (c *msgCollector) waitFor(msg collectable) error {
 		result:     make(chan collectResult, 1),
 	}
 
+	fmt.Println("select in waitFor...")
 	select {
 	case <-c.done:
+		fmt.Println("...c.done")
 		return errors.New("msgCollector closed")
 	case c.subscribe <- &sub:
+		fmt.Println("...c.subscribe <- &sub")
 	}
 
+	fmt.Println("result := <-sub.results...")
 	result := <-sub.result
+	fmt.Println("...done")
 	if result.err != nil {
 		return result.err
 	}

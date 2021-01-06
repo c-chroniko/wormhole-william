@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -17,6 +18,7 @@ const DEFAULT_APP_ID = "myFileTransfer"
 const DEFAULT_RENDEZVOUS_URL = "http://localhost:4000/v1"
 const DEFAULT_TRANSIT_RELAY_ADDRESS = "localhost:4001"
 const DEFAULT_PASSPHRASE_COMPONENT_LENGTH = 2
+const MAX_FILE_SIZE = 100000000 // bytes
 
 var (
 	ErrClientNotFound = fmt.Errorf("%s", "wormhole client not found")
@@ -107,6 +109,41 @@ func Client_SendText(this js.Value, args []js.Value) interface{} {
 	})
 }
 
+func Client_SendFile(this js.Value, args []js.Value) interface{} {
+	ctx := context.Background()
+	fmt.Printf("this: %v\n", this)
+
+	return NewPromise(func(resolve ResolveFn, reject RejectFn) {
+		if len(args) != 3 {
+			reject(fmt.Errorf("invalid number of arguments: %d. expected: %d", len(args), 3))
+			return
+		}
+
+		clientPtr := uintptr(args[0].Int())
+		fileName := args[1].String()
+
+		// TODO: something better!
+		fileData := make([]byte, MAX_FILE_SIZE)
+		js.CopyBytesToGo(fileData, args[2])
+		fileReader := bytes.NewReader(fileData)
+
+		err, client := getClient(clientPtr)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		go func() {
+			code, _, err := client.SendFile(ctx, fileName, fileReader)
+			if err != nil {
+				reject(err)
+				return
+			}
+			resolve(code)
+		}()
+	})
+}
+
 func Client_RecvText(this js.Value, args []js.Value) interface{} {
 	ctx := context.Background()
 
@@ -137,6 +174,48 @@ func Client_RecvText(this js.Value, args []js.Value) interface{} {
 				return
 			}
 			resolve(string(msgBytes))
+		}()
+	}).JSValue()
+}
+
+func Client_RecvFile(this js.Value, args []js.Value) interface{} {
+	ctx := context.Background()
+
+	return NewPromise(func(resolve ResolveFn, reject RejectFn) {
+		if len(args) != 2 {
+			reject(fmt.Errorf("invalid number of arguments: %d. expected: %d", len(args), 2))
+			return
+		}
+
+		clientPtr := uintptr(args[0].Int())
+		code := args[1].String()
+		err, client := getClient(clientPtr)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		go func() {
+			fmt.Println("client.Receive...")
+			msg, err := client.Receive(ctx, code)
+			fmt.Println("...done")
+			if err != nil {
+				fmt.Printf("err: %s\n", err)
+				reject(err)
+				return
+			}
+
+			fmt.Println("ioutil.ReadAll...")
+			msgBytes, err := ioutil.ReadAll(msg)
+			if err != nil {
+				reject(err)
+				return
+			}
+
+			// TODO: something better!
+			fmt.Println("copying bytes")
+			jsData := js.Global().Get("Uint8Array").New(MAX_FILE_SIZE)
+			resolve(js.CopyBytesToJS(jsData, msgBytes))
 		}()
 	}).JSValue()
 }

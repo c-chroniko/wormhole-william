@@ -21,6 +21,7 @@ import (
 // It returns an IncomingMessage with metadata about the payload being sent.
 // To read the contents of the message call IncomingMessage.Read().
 func (c *Client) Receive(ctx context.Context, code string) (fr *IncomingMessage, returnErr error) {
+	fmt.Println("hello from client.Receive!")
 	sideID := crypto.RandSideID()
 	appID := c.appID()
 	rc := rendezvous.NewClient(c.url(), sideID, appID)
@@ -37,6 +38,7 @@ func (c *Client) Receive(ctx context.Context, code string) (fr *IncomingMessage,
 		rc.Close(ctx, mood)
 	}()
 
+	fmt.Println("one")
 	_, err := rc.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -51,34 +53,41 @@ func (c *Client) Receive(ctx context.Context, code string) (fr *IncomingMessage,
 		return nil, err
 	}
 
+	fmt.Println("two")
 	clientProto := newClientProtocol(ctx, rc, sideID, appID)
 
+	fmt.Println("three")
 	err = clientProto.WritePake(ctx, code)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("four")
 	err = clientProto.ReadPake()
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("five")
 	err = clientProto.WriteVersion(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("six")
 	_, err = clientProto.ReadVersion()
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("seven")
 	if c.VerifierOk != nil {
 		verifier, err := clientProto.Verifier()
 		if err != nil {
 			return nil, err
 		}
 
+		fmt.Println("eight")
 		if ok := c.VerifierOk(hex.EncodeToString(verifier)); !ok {
 			errMsg := "sender rejected verification check, abandoned transfer"
 			writeErr := clientProto.WriteAppData(ctx, &genericMessage{
@@ -88,24 +97,31 @@ func (c *Client) Receive(ctx context.Context, code string) (fr *IncomingMessage,
 				return nil, writeErr
 			}
 
+			fmt.Println("nine")
 			return nil, errors.New(errMsg)
 		}
 	}
 
+	fmt.Println("ten")
 	collector, err := clientProto.Collect(collectOffer, collectTransit)
 	if err != nil {
 		return nil, err
 	}
 	defer collector.close()
 
+	fmt.Println("eleven")
 	var offer offerMsg
 	err = collector.waitFor(&offer)
+	fmt.Println("eleven.1")
 	if err != nil {
+		fmt.Println("eleven.2")
 		return nil, err
 	}
+	fmt.Println("eleven.3")
 
 	fr = &IncomingMessage{}
 
+	fmt.Println("twelve")
 	if offer.Message != nil {
 		answer := genericMessage{
 			Answer: &answerMsg{
@@ -113,17 +129,20 @@ func (c *Client) Receive(ctx context.Context, code string) (fr *IncomingMessage,
 			},
 		}
 
+		fmt.Println("thirteen")
 		err = clientProto.WriteAppData(ctx, &answer)
 		if err != nil {
 			return nil, err
 		}
 
+		fmt.Println("fourteen")
 		rc.Close(ctx, rendezvous.Happy)
 
 		fr.Type = TransferText
 		fr.textReader = bytes.NewReader([]byte(*offer.Message))
 		return fr, nil
 	} else if offer.File != nil {
+		fmt.Println("fifteen")
 		fr.Type = TransferFile
 		fr.Name = offer.File.FileName
 		fr.TransferBytes = int(offer.File.FileSize)
@@ -132,6 +151,7 @@ func (c *Client) Receive(ctx context.Context, code string) (fr *IncomingMessage,
 		fr.UncompressedBytes64 = offer.File.FileSize
 		fr.FileCount = 1
 	} else if offer.Directory != nil {
+		fmt.Println("sixteen")
 		fr.Type = TransferDirectory
 		fr.Name = offer.Directory.Dirname
 		fr.TransferBytes = int(offer.Directory.ZipSize)
@@ -140,26 +160,32 @@ func (c *Client) Receive(ctx context.Context, code string) (fr *IncomingMessage,
 		fr.UncompressedBytes64 = offer.Directory.NumBytes
 		fr.FileCount = int(offer.Directory.NumFiles)
 	} else {
+		fmt.Println("seventeen")
 		return nil, errors.New("got non-file transfer offer")
 	}
 
+	fmt.Println("eighteen")
 	var gotTransitMsg transitMsg
 	err = collector.waitFor(&gotTransitMsg)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("newFileTransport!")
 	transitKey := deriveTransitKey(clientProto.sharedKey, appID)
 	transport := newFileTransport(transitKey, appID, c.relayAddr())
+	fmt.Println("post newFileTransport!")
 
 	transitMsg, err := transport.makeTransitMsg()
 	if err != nil {
 		return nil, fmt.Errorf("make transit msg error: %s", err)
 	}
 
+	fmt.Println("clientProto.WriteAppData!")
 	err = clientProto.WriteAppData(ctx, &genericMessage{
 		Transit: transitMsg,
 	})
+	fmt.Println("post clientProto.WriteAppData!")
 	if err != nil {
 		return nil, err
 	}
