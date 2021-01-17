@@ -240,19 +240,20 @@ func (c *Client) Receive(ctx context.Context, code string) (fr *IncomingMessage,
 			return err
 		}
 
-		conn, err := transport.connectDirect(&gotTransitMsg)
-		if err != nil {
-			return err
-		}
+		//conn, err := transport.connectDirect(&gotTransitMsg)
+		//if err != nil {
+		//	return err
+		//}
 
-		if conn == nil {
-			conn, err = transport.connectViaRelay(&gotTransitMsg)
+		//if conn == nil {
+			conn, err := transport.connectViaRelay(&gotTransitMsg)
 			if err != nil {
 				return err
 			}
-		}
+		//}
 
 		if conn == nil {
+			fmt.Println("conn == nil")
 			return errors.New("failed to establish connection")
 		}
 

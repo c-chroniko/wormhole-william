@@ -298,11 +298,12 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *offerMsg, r io.Re
 
 		transitKey := deriveTransitKey(clientProto.sharedKey, appID)
 		transport := newFileTransport(transitKey, appID, c.relayAddr())
-		err = transport.listen()
-		if err != nil {
-			sendErr(err)
-			return
-		}
+		// TODO: don't if we know we're in a browser!
+		//err = transport.listen()
+		//if err != nil {
+		//	sendErr(err)
+		//	return
+		//}
 
 		err = transport.listenRelay()
 		if err != nil {
@@ -310,12 +311,15 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *offerMsg, r io.Re
 			return
 		}
 
+		fmt.Println("transport.makeTransitMsg")
 		transit, err := transport.makeTransitMsg()
 		if err != nil {
+			fmt.Printf("error making transport message: %s\n", err)
 			sendErr(fmt.Errorf("make transit msg error: %s", err))
 			return
 		}
 
+		fmt.Println("clientProto.WriteAppData transit")
 		err = clientProto.WriteAppData(ctx, &genericMessage{
 			Transit: transit,
 		})
@@ -327,12 +331,14 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *offerMsg, r io.Re
 		gmOffer := &genericMessage{
 			Offer: offer,
 		}
+		fmt.Println("clientProto.WriteAppData offer")
 		err = clientProto.WriteAppData(ctx, gmOffer)
 		if err != nil {
 			sendErr(err)
 			return
 		}
 
+		fmt.Println("clientProto.Collect")
 		collector, err := clientProto.Collect()
 		if err != nil {
 			sendErr(err)
@@ -341,17 +347,20 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *offerMsg, r io.Re
 		defer collector.close()
 
 		var answer answerMsg
+		fmt.Println("collector.waitFor")
 		err = collector.waitFor(&answer)
 		if err != nil {
 			sendErr(err)
 			return
 		}
+		fmt.Println("...collected answer!")
 
 		if answer.FileAck != "ok" {
 			sendErr(fmt.Errorf("unexpected answer"))
 			return
 		}
 
+		fmt.Println("transport.acceptConnection")
 		conn, err := transport.acceptConnection(ctx)
 		if err != nil {
 			sendErr(err)

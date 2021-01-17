@@ -13,11 +13,13 @@ import (
 	"math/big"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/nacl/secretbox"
+	ws "nhooyr.io/websocket"
 )
 
 type fileTransportAck struct {
@@ -171,6 +173,7 @@ type fileTransport struct {
 }
 
 func (t *fileTransport) connectViaRelay(otherTransit *transitMsg) (net.Conn, error) {
+	fmt.Println("connectViaRelay")
 	cancelFuncs := make(map[string]func())
 
 	successChan := make(chan net.Conn)
@@ -179,18 +182,27 @@ func (t *fileTransport) connectViaRelay(otherTransit *transitMsg) (net.Conn, err
 	var count int
 
 	for _, outerHint := range otherTransit.HintsV1 {
+		fmt.Println("if outerHint.type == \"relay-v1\"...")
 		if outerHint.Type == "relay-v1" {
+			fmt.Println("true")
 			for _, innerHint := range outerHint.Hints {
+				fmt.Println("if innerHint.type == \"direct-tcp-v1\"")
 				if innerHint.Type == "direct-tcp-v1" {
+					fmt.Println("true")
 					count++
 					ctx, cancel := context.WithCancel(context.Background())
 					addr := net.JoinHostPort(innerHint.Hostname, strconv.Itoa(innerHint.Port))
 
 					cancelFuncs[addr] = cancel
 
+					fmt.Println("go t.connectToRelay")
 					go t.connectToRelay(ctx, addr, successChan, failChan)
+				} else {
+					fmt.Println("false")
 				}
 			}
+		} else {
+			fmt.Println("false")
 		}
 	}
 
@@ -251,32 +263,75 @@ func (t *fileTransport) connectDirect(otherTransit *transitMsg) (net.Conn, error
 }
 
 func (t *fileTransport) connectToRelay(ctx context.Context, addr string, successChan chan net.Conn, failChan chan string) {
-	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		failChan <- addr
-		return
+	fmt.Println("t *fileTransport#connectToRelay")
+
+	// TODO: refactor!
+	hostParts := strings.SplitN(t.relayAddr, "://", 2)
+	fmt.Printf("hostParts: %v\n", hostParts)
+	var (
+		d    net.Dialer
+		conn net.Conn
+		err  error
+	)
+	if len(hostParts) == 2 {
+		fmt.Println("hostParts == 2")
+		proto := hostParts[0]
+		if proto == "ws" || proto == "wss" {
+			fmt.Println("proto == ws/wss")
+			wsConn, _, err := ws.Dial(ctx, t.relayAddr, nil)
+			if err != nil {
+				failChan <- addr
+				return
+			}
+			conn = ws.NetConn(ctx, wsConn, ws.MessageBinary)
+			fmt.Printf("conn = ws.NetConn: %v\n", conn)
+		}
+	} else {
+		//fmt.Println("conn = net.Dial tcp")
+		//conn, err = net.Dial("tcp", t.relayAddr)
+		//if err != nil {
+		//	failChan <- addr
+		//	return
+		//}
+
+		fmt.Println("conn = d.DialContext tcp")
+		conn, err = d.DialContext(ctx, "tcp", addr)
+		if err != nil {
+			failChan <- addr
+			fmt.Println("error in conn = d.DialContext tcp")
+			return
+		}
 	}
 
+
+	fmt.Println("conn.Write(t.relayHandhskeHeader())")
+	fmt.Printf("conn: %v\n", conn)
 	_, err = conn.Write(t.relayHandshakeHeader())
 	if err != nil {
+		fmt.Println("error in conn.Write(t.relayHandhskeHeader())")
 		failChan <- addr
 		return
 	}
-	gotOk := make([]byte, 3)
-	_, err = io.ReadFull(conn, gotOk)
+	gotOk := make([]byte, 2)
+	fmt.Println("io.ReadFull(conn, gotOk)")
+	fmt.Printf("conn: %v\n", conn)
+	n, err := io.ReadFull(conn, gotOk)
 	if err != nil {
+		fmt.Printf("error in io.ReadFull(conn, gotOk)| n: %d; err: %s\n", n, err)
 		conn.Close()
 		failChan <- addr
 		return
 	}
 
-	if !bytes.Equal(gotOk, []byte("ok\n")) {
+	fmt.Printf("!bytes.Equal(gotOk, ...): %s | %v\n", string(gotOk), gotOk)
+	if !bytes.Equal(gotOk, []byte("ok")) {
 		conn.Close()
 		failChan <- addr
+		fmt.Printf("error in !bytes.Equal(gotOk, ...)| gotOk: %s\n", gotOk)
 		return
 	}
 
+	fmt.Println("t.directRecvHAndshake")
 	t.directRecvHandshake(ctx, addr, conn, successChan, failChan)
 }
 
@@ -293,39 +348,49 @@ func (t *fileTransport) connectToSingleHost(ctx context.Context, addr string, su
 }
 
 func (t *fileTransport) directRecvHandshake(ctx context.Context, addr string, conn net.Conn, successChan chan net.Conn, failChan chan string) {
+	fmt.Println("hello from directRecvHandshake")
 	expectHeader := t.senderHandshakeHeader()
 
 	gotHeader := make([]byte, len(expectHeader))
 
-	_, err := io.ReadFull(conn, gotHeader)
+	fmt.Println("directRecvHandshake->io.ReadFull")
+	n, err := io.ReadFull(conn, gotHeader)
+	fmt.Printf("n: %d; gotHeader: %s; err: %s\n", n, gotHeader, err)
 	if err != nil {
+		fmt.Printf("io.ReadFull err: %s\n", err)
 		conn.Close()
 		failChan <- addr
 		return
 	}
 
+	fmt.Println("subtle.ConstantTimeCompare")
 	if subtle.ConstantTimeCompare(gotHeader, expectHeader) != 1 {
+		fmt.Println("subtle.ConstantTimeCompare err")
 		conn.Close()
 		failChan <- addr
 		return
 	}
 
+	fmt.Println("con.Write(t.receiverHAndshakeHeader")
 	_, err = conn.Write(t.receiverHandshakeHeader())
 	if err != nil {
+		fmt.Println("con.Write(t.receiverHAndshakeHeader err")
 		conn.Close()
 		failChan <- addr
 		return
 	}
 
-	gotGo := make([]byte, 3)
+	gotGo := make([]byte, 2)
+	fmt.Println("io.ReadFull 2")
 	_, err = io.ReadFull(conn, gotGo)
+	fmt.Println("io.ReadFull 2 err")
 	if err != nil {
 		conn.Close()
 		failChan <- addr
 		return
 	}
 
-	if !bytes.Equal(gotGo, []byte("go\n")) {
+	if !bytes.Equal(gotGo, []byte("go")) {
 		conn.Close()
 		failChan <- addr
 		return
@@ -349,6 +414,7 @@ func (t *fileTransport) makeTransitMsg() (*transitMsg, error) {
 	}
 
 	if t.listener != nil {
+		fmt.Println("t.listener != nil!!!")
 		_, portStr, err := net.SplitHostPort(t.listener.Addr().String())
 		if err != nil {
 			return nil, err
@@ -372,7 +438,19 @@ func (t *fileTransport) makeTransitMsg() (*transitMsg, error) {
 	}
 
 	if t.relayConn != nil {
-		relayHost, portStr, err := net.SplitHostPort(t.relayAddr)
+		fmt.Println("t.relayConn != nil!!!")
+		var (
+			portStr, relayHost string
+			err                error
+		)
+		switch {
+		case strings.HasPrefix(t.relayAddr, "ws://"):
+			relayHost, portStr, err = net.SplitHostPort(t.relayAddr[5:])
+		case strings.HasPrefix(t.relayAddr, "wss://"):
+			relayHost, portStr, err = net.SplitHostPort(t.relayAddr[6:])
+		default:
+			relayHost, portStr, err = net.SplitHostPort(t.relayAddr)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -409,7 +487,7 @@ func (t *fileTransport) senderHandshakeHeader() []byte {
 		panic(err)
 	}
 
-	return []byte(fmt.Sprintf("transit sender %x ready\n\n", out))
+	return []byte(fmt.Sprintf("transit sender %x ready\n", out))
 }
 
 func (t *fileTransport) receiverHandshakeHeader() []byte {
@@ -423,7 +501,7 @@ func (t *fileTransport) receiverHandshakeHeader() []byte {
 		panic(err)
 	}
 
-	return []byte(fmt.Sprintf("transit receiver %x ready\n\n", out))
+	return []byte(fmt.Sprintf("transit receiver %x ready\n", out))
 }
 
 func (t *fileTransport) relayHandshakeHeader() []byte {
@@ -460,44 +538,77 @@ func (t *fileTransport) listen() error {
 }
 
 func (t *fileTransport) listenRelay() error {
+	fmt.Println("hello from listenRelay")
+
+	// TODO: consider if/how contexts are being used and be consistent and/or correct.
+	ctx := context.Background()
 	if t.relayAddr == "" {
 		return nil
 	}
-	conn, err := net.Dial("tcp", t.relayAddr)
-	if err != nil {
-		return err
+
+	hostParts := strings.SplitN(t.relayAddr, "://", 2)
+	fmt.Printf("hostParts: %v\n", hostParts)
+	var (
+		conn net.Conn
+		err  error
+	)
+	if len(hostParts) == 2 {
+		fmt.Println("hostParts == 2")
+		proto := hostParts[0]
+		if proto == "ws" || proto == "wss" {
+			fmt.Println("proto == ws/wss")
+			wsConn, _, err := ws.Dial(ctx, t.relayAddr, nil)
+			if err != nil {
+				return err
+			}
+			fmt.Println("conn = ws.NetConn")
+			conn = ws.NetConn(ctx, wsConn, ws.MessageBinary)
+		}
+	} else {
+		fmt.Println("conn = net.Dial tcp")
+		conn, err = net.Dial("tcp", t.relayAddr)
+		if err != nil {
+			return err
+		}
 	}
 
+	fmt.Println("connWrite")
 	_, err = conn.Write(t.relayHandshakeHeader())
 	if err != nil {
 		conn.Close()
 		return err
 	}
 
+	fmt.Println("t.relayConn = conn")
 	t.relayConn = conn
 	return nil
 }
 
 func (t *fileTransport) waitForRelayPeer(conn net.Conn, cancelCh chan struct{}) error {
+	fmt.Println("hello from waitForRelayPeer")
 	okCh := make(chan struct{})
 	go func() {
 		select {
 		case <-cancelCh:
+			fmt.Println("<-cancelCh")
 			conn.Close()
 		case <-okCh:
+			fmt.Println("<-okCh")
 		}
 	}()
 
 	defer close(okCh)
 
-	gotOk := make([]byte, 3)
+	gotOk := make([]byte, 2)
 	_, err := io.ReadFull(conn, gotOk)
 	if err != nil {
+		fmt.Printf("waitForRelayPeer->io.ReadFull err: %s\n", err)
 		conn.Close()
 		return err
 	}
 
-	if !bytes.Equal(gotOk, []byte("ok\n")) {
+	fmt.Printf("gotOk: %v", gotOk)
+	if !bytes.Equal(gotOk, []byte("ok")) {
 		conn.Close()
 		return errors.New("got non ok status from relay server")
 	}

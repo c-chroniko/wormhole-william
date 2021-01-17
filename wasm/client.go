@@ -16,7 +16,7 @@ type ClientMap = map[uintptr]*wormhole.Client
 // TODO: automate use of `-ld -X` with env vars
 const DEFAULT_APP_ID = "myFileTransfer"
 const DEFAULT_RENDEZVOUS_URL = "http://localhost:4000/v1"
-const DEFAULT_TRANSIT_RELAY_ADDRESS = "localhost:4001"
+const DEFAULT_TRANSIT_RELAY_ADDRESS = "ws://localhost:4001"
 const DEFAULT_PASSPHRASE_COMPONENT_LENGTH = 2
 const MAX_FILE_SIZE = 100000000 // bytes
 

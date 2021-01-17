@@ -97,10 +97,23 @@ func (c *Client) relayAddr() string {
 }
 
 func (c *Client) validateRelayAddr() error {
-	if c.relayAddr() == "" {
+	var (
+		relayAddr = c.relayAddr()
+		err error
+	)
+
+	// TODO: refactor
+	if relayAddr == "" {
 		return nil
 	}
-	_, _, err := net.SplitHostPort(c.relayAddr())
+	switch {
+	case strings.HasPrefix(relayAddr, "ws://"):
+		_, _, err = net.SplitHostPort(relayAddr[5:])
+	case strings.HasPrefix(relayAddr, "wss://"):
+		_, _, err = net.SplitHostPort(relayAddr[6:])
+	default:
+		_, _, err = net.SplitHostPort(relayAddr)
+	}
 	return err
 }
 
@@ -322,6 +335,7 @@ func (c *msgCollector) close() {
 }
 
 func (c *msgCollector) waitFor(msg collectable) error {
+	fmt.Println("hello from waitFor")
 	if reflect.ValueOf(msg).Kind() != reflect.Ptr {
 		return errors.New("you must pass waitFor a pointer to a struct")
 	}
@@ -365,10 +379,12 @@ type collectSubscription struct {
 }
 
 func (c *msgCollector) collect(ch <-chan rendezvous.MailboxEvent) {
+	fmt.Println("hello from collect")
 	pendingMsgs := make(map[collectType]collectable)
 	waiters := make(map[collectType]*collectSubscription)
 
 	errorResult := func(e error) {
+		fmt.Println("hello from collect errorResult func body")
 		c.close()
 		for t, waiter := range waiters {
 			waiter.result <- collectResult{
@@ -379,19 +395,25 @@ func (c *msgCollector) collect(ch <-chan rendezvous.MailboxEvent) {
 		}
 	}
 
+	fmt.Println("collect for")
 	for {
 		select {
 		case <-c.done:
+			fmt.Println("collect <-c.done")
 			return
 		case sub := <-c.subscribe:
+			fmt.Println("collect <-c.subscribe")
 			collectType := sub.collectMsg.Type()
 
+			fmt.Printf("collectType: %s\n", collectType.String())
 			if m := pendingMsgs[collectType]; m != nil {
+				fmt.Println("pending message found! :D")
 				sub.result <- collectResult{
 					result: m,
 				}
 				delete(pendingMsgs, collectType)
 			} else {
+				fmt.Println("pending message not found :(")
 				if waiters[collectType] != nil {
 					sub.result <- collectResult{
 						err: errors.New("there is already a pending collect request for this type"),
@@ -401,6 +423,7 @@ func (c *msgCollector) collect(ch <-chan rendezvous.MailboxEvent) {
 				}
 			}
 		case gotMsg, ok := <-ch:
+			fmt.Println("collect <-ch")
 			if !ok {
 				c.close()
 				return
