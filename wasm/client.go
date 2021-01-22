@@ -215,7 +215,8 @@ func Client_RecvFile(this js.Value, args []js.Value) interface{} {
 			// TODO: something better!
 			fmt.Println("copying bytes")
 			jsData := js.Global().Get("Uint8Array").New(MAX_FILE_SIZE)
-			resolve(js.CopyBytesToJS(jsData, msgBytes))
+			js.CopyBytesToJS(jsData, msgBytes)
+			resolve(jsData)
 		}()
 	}).JSValue()
 }
