@@ -47,7 +47,7 @@ func (tt TransferType) String() string {
 }
 
 type transportCryptor struct {
-	conn           net.Conn
+	conn           relayConnection
 	prefixBuf      []byte
 	nextReadNonce  *big.Int
 	nextWriteNonce uint64
@@ -56,7 +56,7 @@ type transportCryptor struct {
 	writeKey       [32]byte
 }
 
-func newTransportCryptor(c net.Conn, transitKey []byte, readPurpose, writePurpose string) *transportCryptor {
+func newTransportCryptor(c relayConnection, transitKey []byte, readPurpose, writePurpose string) *transportCryptor {
 	r := hkdf.New(sha256.New, transitKey, nil, []byte(readPurpose))
 	var readKey [32]byte
 	_, err := io.ReadFull(r, readKey[:])
@@ -162,9 +162,13 @@ func newFileTransport(transitKey []byte, appID, relayAddr string) *fileTransport
 	}
 }
 
+type relayConnection interface {
+	io.ReadWriteCloser
+}
+
 type fileTransport struct {
 	listener   net.Listener
-	relayConn  net.Conn
+	relayConn  relayConnection //net.Conn
 	relayAddr  string
 	transitKey []byte
 	appID      string
@@ -188,7 +192,15 @@ func (t *fileTransport) connectViaRelay(otherTransit *transitMsg) (net.Conn, err
 
 					cancelFuncs[addr] = cancel
 
-					go t.connectToRelay(ctx, addr, successChan, failChan)
+					go t.connectToRelay(ctx, "tcp", addr, successChan, failChan)
+				} else if innerHint.Type == "direct-ws-v1" {
+					count++
+					ctx, cancel := context.WithCancel(context.Background())
+					addr := "ws://" + net.JoinHostPort(innerHint.Hostname, strconv.Itoa(innerHint.Port))
+
+					cancelFuncs[addr] = cancel
+
+					go t.connectToRelay(ctx, "ws", addr, successChan, failChan)
 				}
 			}
 		}
@@ -250,9 +262,21 @@ func (t *fileTransport) connectDirect(otherTransit *transitMsg) (net.Conn, error
 	return conn, nil
 }
 
-func (t *fileTransport) connectToRelay(ctx context.Context, addr string, successChan chan net.Conn, failChan chan string) {
+
+func dialRelay(ctx context.Context, proto string, addr string) (relayConnection, error) {
+	switch proto {
+	case "tcp":
+		var d net.Dialer
+		return d.DialContext(ctx, "tcp", addr)
+	default:
+		return nil, nil
+	}
+}
+
+func (t *fileTransport) connectToRelay(ctx context.Context, proto string, addr string, successChan chan net.Conn, failChan chan string) {
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "tcp", addr)
+
 	if err != nil {
 		failChan <- addr
 		return
@@ -478,7 +502,7 @@ func (t *fileTransport) listenRelay() error {
 	return nil
 }
 
-func (t *fileTransport) waitForRelayPeer(conn net.Conn, cancelCh chan struct{}) error {
+func (t *fileTransport) waitForRelayPeer(conn relayConnection, cancelCh chan struct{}) error {
 	okCh := make(chan struct{})
 	go func() {
 		select {
@@ -505,8 +529,8 @@ func (t *fileTransport) waitForRelayPeer(conn net.Conn, cancelCh chan struct{}) 
 	return nil
 }
 
-func (t *fileTransport) acceptConnection(ctx context.Context) (net.Conn, error) {
-	readyCh := make(chan net.Conn)
+func (t *fileTransport) acceptConnection(ctx context.Context) (relayConnection, error) {
+	readyCh := make(chan relayConnection)
 	cancelCh := make(chan struct{})
 	acceptErrCh := make(chan error, 1)
 
@@ -556,7 +580,7 @@ func (t *fileTransport) acceptConnection(ctx context.Context) (net.Conn, error) 
 	}
 }
 
-func (t *fileTransport) handleIncomingConnection(conn net.Conn, readyCh chan<- net.Conn, cancelCh chan struct{}) {
+func (t *fileTransport) handleIncomingConnection(conn relayConnection, readyCh chan<- relayConnection, cancelCh chan struct{}) {
 	okCh := make(chan struct{})
 
 	go func() {
