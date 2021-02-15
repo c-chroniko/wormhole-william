@@ -27,7 +27,7 @@ func TestWormholeSendRecvText(t *testing.T) {
 	url := rs.WebSocketURL()
 
 	// disable transit relay
-	DefaultTransitRelayAddress = ""
+	DefaultTransitRelayUrl = ""
 
 	var c0Verifier string
 	var c0 Client
@@ -158,7 +158,7 @@ func TestVerifierAbort(t *testing.T) {
 	url := rs.WebSocketURL()
 
 	// disable transit relay
-	DefaultTransitRelayAddress = ""
+	DefaultTransitRelayUrl = ""
 
 	var c0 Client
 	c0.RendezvousURL = url
@@ -201,7 +201,7 @@ func TestWormholeFileReject(t *testing.T) {
 	url := rs.WebSocketURL()
 
 	// disable transit relay for this test
-	DefaultTransitRelayAddress = ""
+	DefaultTransitRelayUrl = ""
 
 	var c0 Client
 	c0.RendezvousURL = url
@@ -251,11 +251,11 @@ func TestWormholeFileTransportSendRecvViaRelayServer(t *testing.T) {
 
 	var c0 Client
 	c0.RendezvousURL = url
-	c0.TransitRelayAddress = relayServer.addr
+	c0.TransitRelayAddress = "tcp:" + relayServer.addr
 
 	var c1 Client
 	c1.RendezvousURL = url
-	c1.TransitRelayAddress = relayServer.addr
+	c1.TransitRelayAddress = "tcp:" + relayServer.addr
 
 	fileContent := make([]byte, 1<<16)
 	for i := 0; i < len(fileContent); i++ {
@@ -306,11 +306,11 @@ func TestWormholeBigFileTransportSendRecvViaRelayServer(t *testing.T) {
 
 	var c0 Client
 	c0.RendezvousURL = url
-	c0.TransitRelayAddress = relayServer.addr
+	c0.TransitRelayAddress = "tcp:" + relayServer.addr
 
 	var c1 Client
 	c1.RendezvousURL = url
-	c1.TransitRelayAddress = relayServer.addr
+	c1.TransitRelayAddress = "tcp:" + relayServer.addr
 
 	// Create a fake file offer
 	var fakeBigSize int64 = 32098461509
@@ -351,7 +351,7 @@ func TestWormholeDirectoryTransportSendRecvDirect(t *testing.T) {
 	url := rs.WebSocketURL()
 
 	// disable transit relay for this test
-	DefaultTransitRelayAddress = ""
+	DefaultTransitRelayUrl = ""
 
 	var c0Verifier string
 	var c0 Client
@@ -588,5 +588,18 @@ func (ts *testRelayServer) handleConn(c net.Conn) {
 		io.Copy(existing, c)
 		c.Close()
 		existing.Close()
+	}
+}
+
+func TestRelayUrlProto(t *testing.T) {
+	var c Client;
+
+	DefaultTransitRelayUrl = "tcp:transit.magic-wormhole.io:8001"
+	p, err := c.getProtocol()
+	if err != nil {
+		t.Error(err)
+	}
+	if p != "tcp" {
+		t.Error(fmt.Sprintf("invalid protocol, expected tcp, got %v", p))
 	}
 }

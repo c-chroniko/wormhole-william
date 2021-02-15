@@ -155,11 +155,12 @@ func (d *transportCryptor) writeRecord(msg []byte) error {
 	return err
 }
 
-func newFileTransport(transitKey []byte, appID, relayAddr string) *fileTransport {
+func newFileTransport(transitKey []byte, appID, relayProto string, relayAddr string) *fileTransport {
 	return &fileTransport{
 		transitKey: transitKey,
 		appID:      appID,
 		relayAddr:  relayAddr,
+		relayProto: relayProto,
 	}
 }
 
@@ -167,6 +168,7 @@ type fileTransport struct {
 	listener   net.Listener
 	relayConn  net.Conn
 	relayAddr  string
+	relayProto string
 	transitKey []byte
 	appID      string
 }
@@ -264,7 +266,6 @@ func (t *fileTransport) connectDirect(otherTransit *transitMsg) (net.Conn, error
 func (t *fileTransport) connectToRelay(ctx context.Context, proto string, addr string, successChan chan net.Conn, failChan chan string) {
 	var d net.Dialer
 	var conn net.Conn
-	var wsconn *websocket.Conn
 	var err error
 	if proto == "tcp" {
 		conn, err = d.DialContext(ctx, proto, addr)
@@ -274,6 +275,7 @@ func (t *fileTransport) connectToRelay(ctx context.Context, proto string, addr s
 			return
 		}
 	} else if proto == "ws" {
+		var wsconn *websocket.Conn
 		wsconn, _, err = websocket.Dial(ctx, "ws://" + addr, nil)
 
 		if err != nil {

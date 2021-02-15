@@ -63,8 +63,8 @@ var (
 	// DefaultRendezvousURL is the default Rendezvous server to use.
 	DefaultRendezvousURL = "ws://relay.magic-wormhole.io:4000/v1"
 
-	// DefaultTransitRelayAddress is the default transit server to ues.
-	DefaultTransitRelayAddress = "transit.magic-wormhole.io:4001"
+	// DefaultTransitRelayUrl is the default transit server to use.
+	DefaultTransitRelayUrl = "tcp:transit.magic-wormhole.io:4001"
 )
 
 func (c *Client) url() string {
@@ -89,19 +89,56 @@ func (c *Client) wordCount() int {
 	}
 }
 
-func (c *Client) relayAddr() string {
+func (c *Client) relayUrl() string {
 	if c.TransitRelayAddress != "" {
 		return c.TransitRelayAddress
 	}
-	return DefaultTransitRelayAddress
+
+	return DefaultTransitRelayUrl
 }
 
-func (c *Client) validateRelayAddr() error {
-	if c.relayAddr() == "" {
+func (c *Client) relayAddr() (string, error) {
+	url := c.relayUrl()
+
+	if url == "" {
+		return "", nil
+	}
+
+	urlParts := strings.Split(url, ":")
+	hostport := strings.Join(urlParts[1:], ":")
+	_, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return "", err
+	}
+
+	return hostport, nil
+}
+
+func (c *Client) getProtocol() (string, error) {
+	url := c.relayUrl()
+	if url == "" {
+		return "", nil
+	}
+
+	urlParts := strings.Split(url, ":")
+
+	return urlParts[0], nil
+}
+
+func (c *Client) validateRelayUrl() error {
+	url := c.relayUrl()
+	if url == "" {
 		return nil
 	}
-	_, _, err := net.SplitHostPort(c.relayAddr())
-	return err
+	urlParts := strings.Split(url, ":")
+
+	hostport := strings.Join(urlParts[1:], ":")
+	_, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SendResult has information about whether or not a Send command was successful.
