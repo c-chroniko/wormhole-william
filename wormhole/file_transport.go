@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"time"
 
+	"nhooyr.io/websocket"
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/nacl/secretbox"
@@ -188,7 +189,17 @@ func (t *fileTransport) connectViaRelay(otherTransit *transitMsg) (net.Conn, err
 
 					cancelFuncs[addr] = cancel
 
-					go t.connectToRelay(ctx, addr, successChan, failChan)
+					go t.connectToRelay(ctx, "tcp", addr, successChan, failChan)
+				}
+
+				if innerHint.Type == "direct-ws-v1" {
+					count++
+					ctx, cancel := context.WithCancel(context.Background())
+					addr := net.JoinHostPort(innerHint.Hostname, strconv.Itoa(innerHint.Port))
+
+					cancelFuncs[addr] = cancel
+
+					go t.connectToRelay(ctx, "ws", addr, successChan, failChan)
 				}
 			}
 		}
@@ -250,12 +261,27 @@ func (t *fileTransport) connectDirect(otherTransit *transitMsg) (net.Conn, error
 	return conn, nil
 }
 
-func (t *fileTransport) connectToRelay(ctx context.Context, addr string, successChan chan net.Conn, failChan chan string) {
+func (t *fileTransport) connectToRelay(ctx context.Context, proto string, addr string, successChan chan net.Conn, failChan chan string) {
 	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		failChan <- addr
-		return
+	var conn net.Conn
+	var wsconn *websocket.Conn
+	var err error
+	if proto == "tcp" {
+		conn, err = d.DialContext(ctx, proto, addr)
+
+		if err != nil {
+			failChan <- addr
+			return
+		}
+	} else if proto == "ws" {
+		wsconn, _, err = websocket.Dial(ctx, "ws://" + addr, nil)
+
+		if err != nil {
+			failChan <- addr
+			return
+		}
+
+		conn = websocket.NetConn(ctx, wsconn, websocket.MessageText)
 	}
 
 	_, err = conn.Write(t.relayHandshakeHeader())
