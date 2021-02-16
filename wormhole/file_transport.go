@@ -181,6 +181,7 @@ func (t *fileTransport) connectViaRelay(otherTransit *transitMsg) (net.Conn, err
 
 	var count int
 
+	fmt.Printf("wormhole otherhint %v\n", otherTransit.HintsV1)
 	for _, outerHint := range otherTransit.HintsV1 {
 		if outerHint.Type == "relay-v1" {
 			for _, innerHint := range outerHint.Hints {
@@ -275,10 +276,17 @@ func (t *fileTransport) connectToRelay(ctx context.Context, proto string, addr s
 			return
 		}
 	} else if proto == "ws" {
+		fmt.Printf("wormhole ws dial addr %v\n", addr)
 		var wsconn *websocket.Conn
-		wsconn, _, err = websocket.Dial(ctx, "ws://" + addr, nil)
+		// TODO: that url path has to come from the other side via transit message.
+		// At the moment, it is hard coded here.
+		// The RelayHint messages carry only host, port, type and priority, so this
+		// is something that needs to be modified at the message level. Perhaps create
+		// a new version of the Hints message called HintsV2?
+		wsconn, _, err = websocket.Dial(ctx, "ws://" + addr + "/v1", nil)
 
 		if err != nil {
+			fmt.Printf("wormhole websocket dial failed\n")
 			failChan <- addr
 			return
 		}
@@ -286,20 +294,25 @@ func (t *fileTransport) connectToRelay(ctx context.Context, proto string, addr s
 		conn = websocket.NetConn(ctx, wsconn, websocket.MessageText)
 	}
 
+	fmt.Printf("wormhole prepare to send relayHandshakeheader\n")
 	_, err = conn.Write(t.relayHandshakeHeader())
 	if err != nil {
+		fmt.Printf("wormhole relayHandshakeheader\n")
 		failChan <- addr
 		return
 	}
+	fmt.Printf("wormhole prepare to receive OK\n")
 	gotOk := make([]byte, 3)
 	_, err = io.ReadFull(conn, gotOk)
 	if err != nil {
+		fmt.Printf("wormhole gotOk: %v\n", err)
 		conn.Close()
 		failChan <- addr
 		return
 	}
 
 	if !bytes.Equal(gotOk, []byte("ok\n")) {
+		fmt.Printf("wormhole ok\n")
 		conn.Close()
 		failChan <- addr
 		return
@@ -410,11 +423,20 @@ func (t *fileTransport) makeTransitMsg() (*transitMsg, error) {
 			return nil, fmt.Errorf("port isn't an integer? %s", portStr)
 		}
 
+		var relayType string;
+		if t.relayProto == "tcp" {
+			relayType = "direct-tcp-v1"
+		} else if t.relayProto == "ws" {
+			relayType = "direct-ws-v1"
+		} else {
+			panic("unknown relay protocol")
+		}
+		fmt.Printf("wormhole ws relayHost = %v, relayPort: %v\n", relayHost, relayPort)
 		msg.HintsV1 = append(msg.HintsV1, transitHintsV1{
 			Type: "relay-v1",
 			Hints: []transitHintsV1Hint{
 				{
-					Type:     "direct-tcp-v1",
+					Type:     relayType,
 					Priority: 2.0,
 					Hostname: relayHost,
 					Port:     relayPort,

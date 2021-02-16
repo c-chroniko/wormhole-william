@@ -499,9 +499,9 @@ func (ts *testRelayServer) run() {
 	}
 }
 
-func NewWSTestServer() *testRelayServer {
+func newTestWSRelayServer() *testRelayServer {
 	rs := &testRelayServer{
-		proto:   "tcp",
+		proto:   "ws",
 		streams: make(map[string]net.Conn),
 	}
 
@@ -509,22 +509,24 @@ func NewWSTestServer() *testRelayServer {
 	smux.HandleFunc("/v1", rs.handleWSRelay)
 
 	rs.Server = httptest.NewServer(smux)
+	rs.addr = rs.Server.Listener.Addr().String()
+
 	return rs
 }
 
 func (rs *testRelayServer) handleWSRelay(w http.ResponseWriter, r *http.Request) {
-	for {
-		c, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer c.Close(websocket.StatusInternalError, "testRelayServer: upgrade to websocket mode failed")
+	c, err := websocket.Accept(w, r, nil)
 
-		ctx := context.Background()
-		conn := websocket.NetConn(ctx, c, websocket.MessageText)
-		rs.wg.Add(1)
-		go rs.handleConn(conn)
+	if err != nil {
+		fmt.Printf("wormhole websocket accept: %v\n", err)
+		return
 	}
+	fmt.Printf("wormhole websocket upgrade succeeded\n")
+
+	ctx := context.Background()
+	conn := websocket.NetConn(ctx, c, websocket.MessageText)
+	rs.wg.Add(1)
+	go rs.handleConn(conn)
 }
 
 
@@ -576,6 +578,7 @@ func (ts *testRelayServer) handleConn(c net.Conn) {
 	}
 
 	chanID := string(headerBuf)
+	fmt.Printf("wormhole chanID: %v\n", chanID)
 	if !isHex(chanID) {
 		return
 	}
@@ -596,6 +599,7 @@ func (ts *testRelayServer) handleConn(c net.Conn) {
 		return
 	}
 
+	fmt.Printf("wormhole Got side: %v\n", side)
 	// read \n
 	_, err = io.ReadFull(c, headerBuf[:1])
 	if err != nil {
@@ -611,6 +615,7 @@ func (ts *testRelayServer) handleConn(c net.Conn) {
 	ts.mu.Unlock()
 
 	if found {
+		fmt.Printf("wormhole websocket server: ok\n")
 		existing.Write([]byte("ok\n"))
 		c.Write([]byte("ok\n"))
 		go func() {
@@ -637,5 +642,61 @@ func TestRelayUrlProto(t *testing.T) {
 	}
 	if p != "tcp" {
 		t.Error(fmt.Sprintf("invalid protocol, expected tcp, got %v", p))
+	}
+}
+
+func TestWormholeFileTransportSendRecvViaWSRelayServer(t *testing.T) {
+	ctx := context.Background()
+
+	rs := rendezvousservertest.NewServer()
+	defer rs.Close()
+
+	url := rs.WebSocketURL()
+
+	testDisableLocalListener = true
+	defer func() { testDisableLocalListener = false }()
+
+	relayServer := newTestWSRelayServer()
+	defer relayServer.close()
+
+	var c0 Client
+	c0.RendezvousURL = url
+	c0.TransitRelayURL = "ws:" + relayServer.addr
+
+	fmt.Printf("c0 wormhole TransitRelayurl: %v\n", c0.TransitRelayURL)
+	var c1 Client
+	c1.RendezvousURL = url
+	c1.TransitRelayURL = "ws:" + relayServer.addr
+	fmt.Printf("c1 wormhole TransitRelayurl: %v\n", c1.TransitRelayURL)
+
+	fileContent := make([]byte, 1<<16)
+	for i := 0; i < len(fileContent); i++ {
+		fileContent[i] = byte(i)
+	}
+
+	buf := bytes.NewReader(fileContent)
+
+	code, resultCh, err := c0.SendFile(ctx, "file.txt", buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	receiver, err := c1.Receive(ctx, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ioutil.ReadAll(receiver)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(got, fileContent) {
+		t.Fatalf("File contents mismatch")
+	}
+
+	result := <-resultCh
+	if !result.OK {
+		t.Fatalf("Expected ok result but got: %+v", result)
 	}
 }
