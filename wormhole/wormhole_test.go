@@ -510,6 +510,7 @@ func newTestWSRelayServer() *testRelayServer {
 
 	rs.Server = httptest.NewServer(smux)
 	rs.addr = rs.Server.Listener.Addr().String()
+	rs.l = rs.Server.Listener
 
 	return rs
 }
