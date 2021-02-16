@@ -246,7 +246,7 @@ func TestWormholeFileTransportSendRecvViaRelayServer(t *testing.T) {
 	testDisableLocalListener = true
 	defer func() { testDisableLocalListener = false }()
 
-	relayServer := newTestRelayServer()
+	relayServer := newTestTCPRelayServer()
 	defer relayServer.close()
 
 	var c0 Client
@@ -301,7 +301,7 @@ func TestWormholeBigFileTransportSendRecvViaRelayServer(t *testing.T) {
 	testDisableLocalListener = true
 	defer func() { testDisableLocalListener = false }()
 
-	relayServer := newTestRelayServer()
+	relayServer := newTestTCPRelayServer()
 	defer relayServer.close()
 
 	var c0 Client
@@ -460,7 +460,7 @@ type testRelayServer struct {
 	streams map[string]net.Conn
 }
 
-func newTestRelayServer() *testRelayServer {
+func newTestTCPRelayServer() *testRelayServer {
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		panic(err)
