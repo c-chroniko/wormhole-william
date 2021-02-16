@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"io"
 	"io/ioutil"
 	"net"
@@ -15,6 +17,7 @@ import (
 	"sync"
 	"testing"
 
+	"nhooyr.io/websocket"
 	"github.com/psanford/wormhole-william/rendezvous/rendezvousservertest"
 )
 
@@ -453,8 +456,10 @@ func TestWormholeDirectoryTransportSendRecvDirect(t *testing.T) {
 }
 
 type testRelayServer struct {
+	*httptest.Server
 	l       net.Listener
 	addr    string
+	proto   string
 	wg      sync.WaitGroup
 	mu      sync.Mutex
 	streams map[string]net.Conn
@@ -469,6 +474,7 @@ func newTestTCPRelayServer() *testRelayServer {
 	rs := &testRelayServer{
 		l:       l,
 		addr:    l.Addr().String(),
+		proto:   "tcp",
 		streams: make(map[string]net.Conn),
 	}
 
@@ -492,6 +498,35 @@ func (ts *testRelayServer) run() {
 		go ts.handleConn(conn)
 	}
 }
+
+func NewWSTestServer() *testRelayServer {
+	rs := &testRelayServer{
+		proto:   "tcp",
+		streams: make(map[string]net.Conn),
+	}
+
+	smux := http.NewServeMux()
+	smux.HandleFunc("/v1", rs.handleWSRelay)
+
+	rs.Server = httptest.NewServer(smux)
+	return rs
+}
+
+func (rs *testRelayServer) handleWSRelay(w http.ResponseWriter, r *http.Request) {
+	for {
+		c, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close(websocket.StatusInternalError, "testRelayServer: upgrade to websocket mode failed")
+
+		ctx := context.Background()
+		conn := websocket.NetConn(ctx, c, websocket.MessageText)
+		rs.wg.Add(1)
+		go rs.handleConn(conn)
+	}
+}
+
 
 var headerPrefix = []byte("please relay ")
 var headerSide = []byte(" for side ")
