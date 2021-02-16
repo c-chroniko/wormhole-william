@@ -251,11 +251,11 @@ func TestWormholeFileTransportSendRecvViaRelayServer(t *testing.T) {
 
 	var c0 Client
 	c0.RendezvousURL = url
-	c0.TransitRelayAddress = "tcp:" + relayServer.addr
+	c0.TransitRelayURL = "tcp:" + relayServer.addr
 
 	var c1 Client
 	c1.RendezvousURL = url
-	c1.TransitRelayAddress = "tcp:" + relayServer.addr
+	c1.TransitRelayURL = "tcp:" + relayServer.addr
 
 	fileContent := make([]byte, 1<<16)
 	for i := 0; i < len(fileContent); i++ {
@@ -306,11 +306,11 @@ func TestWormholeBigFileTransportSendRecvViaRelayServer(t *testing.T) {
 
 	var c0 Client
 	c0.RendezvousURL = url
-	c0.TransitRelayAddress = "tcp:" + relayServer.addr
+	c0.TransitRelayURL = "tcp:" + relayServer.addr
 
 	var c1 Client
 	c1.RendezvousURL = url
-	c1.TransitRelayAddress = "tcp:" + relayServer.addr
+	c1.TransitRelayURL = "tcp:" + relayServer.addr
 
 	// Create a fake file offer
 	var fakeBigSize int64 = 32098461509
@@ -591,6 +591,7 @@ func (ts *testRelayServer) handleConn(c net.Conn) {
 	}
 }
 
+// test Client.getPrototol() function
 func TestRelayUrlProto(t *testing.T) {
 	var c Client;
 

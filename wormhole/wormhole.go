@@ -33,10 +33,10 @@ type Client struct {
 	// DefaultRendezvousURL will be used.
 	RendezvousURL string
 
-	// TransitRelayAddress is the host:port address to offer
+	// TransitRelayURL is the proto:host:port address to offer
 	// to use for file transfers where direct connections are unavailable.
-	// If empty, DefaultTransitRelayAddress will be used.
-	TransitRelayAddress string
+	// If empty, DefaultTransitRelayUrl will be used.
+	TransitRelayURL string
 
 	// PassPhraseComponentLength is the number of words to use
 	// when generating a passprase. Any value less than 2 will
@@ -90,8 +90,8 @@ func (c *Client) wordCount() int {
 }
 
 func (c *Client) relayUrl() string {
-	if c.TransitRelayAddress != "" {
-		return c.TransitRelayAddress
+	if c.TransitRelayURL != "" {
+		return c.TransitRelayURL
 	}
 
 	return DefaultTransitRelayUrl
