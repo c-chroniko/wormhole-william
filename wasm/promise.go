@@ -17,14 +17,13 @@ type PromiseFn = func(ResolveFn, RejectFn)
 func NewPromise(fn PromiseFn) *Promise {
 	constructor := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		// TODO: error handling!!!
-		obj := js.Global().Get("Object").New()
-		obj.Set("resolve", args[0])
-		obj.Set("reject", args[1])
+		resolveFn := args[0]
+		rejectFn := args[1]
 		resolve := func(val interface{}) {
-			obj.Call("resolve", val)
+			resolveFn.Invoke(val)
 		}
 		reject := func(err error) {
-			obj.Call("reject", err.Error())
+			rejectFn.Invoke(err.Error())
 		}
 
 		go func() {
