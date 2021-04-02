@@ -95,7 +95,7 @@ func (c *Client) SendText(ctx context.Context, msg string, opts ...TransferOptio
 			return
 		}
 
-		err = clientProto.ReadPake()
+		err = clientProto.ReadPake(ctx)
 		if err != nil {
 			sendErr(err)
 			return
@@ -253,7 +253,7 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *OfferMsg, r io.Re
 			return
 		}
 
-		err = clientProto.ReadPake()
+		err = clientProto.ReadPake(ctx)
 		if err != nil {
 			sendErr(err)
 			return
