@@ -45,7 +45,7 @@ func (c *Client) Receive(ctx context.Context, code string, opts ...TransferOptio
 		return nil, err
 	}
 
-	err = clientProto.ReadPake()
+	err = clientProto.ReadPake(ctx)
 	if err != nil {
 		return nil, err
 	}
