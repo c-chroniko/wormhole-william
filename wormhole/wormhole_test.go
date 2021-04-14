@@ -754,6 +754,25 @@ func TestClient_relayURL_default(t *testing.T) {
 	}
 }
 
+// if TransitRelayAddress is set, then it is used instead of
+// TransitRelayURL
+func TestClient_relayURL_relayAddress(t *testing.T) {
+	var c Client
+
+	// transitRelayAddress is in host:port format
+	// protocol is assumed as "tcp".
+	c.TransitRelayAddress = "transit.magic-wormhole.io:4001"
+
+	// if proto field is empty in the input string, then
+	// relayURL() would deduce it as "tcp".
+	url := c.relayURL()
+
+	expectedProto := "tcp"
+	if url.Proto != expectedProto {
+		t.Error(fmt.Sprintf("invalid protocol, expected %v, got %v", expectedProto, url.Proto))
+	}
+}
+
 func TestWormholeFileTransportSendRecvViaWSRelayServer(t *testing.T) {
 	ctx := context.Background()
 
