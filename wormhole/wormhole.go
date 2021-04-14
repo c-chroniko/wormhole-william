@@ -33,6 +33,10 @@ type Client struct {
 	// DefaultRendezvousURL will be used.
 	RendezvousURL string
 
+	// Deprecated: TransitRelayAddress is no longer used,
+	// instead, the new field TransitRelayURL is used.
+	TransitRelayAddress string
+
 	// TransitRelayURL is the proto:host:port address to offer
 	// to use for file transfers where direct connections are unavailable.
 	// If empty, DefaultTransitRelayURL will be used.
@@ -63,7 +67,10 @@ var (
 	// DefaultRendezvousURL is the default Rendezvous server to use.
 	DefaultRendezvousURL = "ws://relay.magic-wormhole.io:4000/v1"
 
-	// DefaultTransitRelayURL is the default transit server to ues.
+	// Deprecated: New code should use DefaultTransitRelayURL.
+	DefaultTransitRelayAddress = ""
+
+	// DefaultTransitRelayURL is the default transit server to use.
 	DefaultTransitRelayURL = "tcp:transit.magic-wormhole.io:4001"
 )
 
@@ -90,6 +97,14 @@ func (c *Client) wordCount() int {
 }
 
 func (c *Client) relayURL() internal.SimpleURL {
+	if c.TransitRelayAddress != "" {
+		relayUrl, err := internal.NewSimpleURL(c.TransitRelayAddress)
+		if err != nil {
+			return relayUrl
+		} else {
+			errors.New("Malformed Transit Relay Address")
+		}
+	}
 	if c.TransitRelayURL != "" {
 		return internal.MustNewSimpleURL(c.TransitRelayURL)
 	}
