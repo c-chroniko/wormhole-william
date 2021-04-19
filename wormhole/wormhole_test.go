@@ -53,17 +53,15 @@ func TestWormholeSendRecvText(t *testing.T) {
 
 	secretText := "Hialeah-deviltry"
 	code, statusChan, err := c0.SendText(ctx, secretText)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 
 	nameplate := strings.SplitN(code, "-", 2)[0]
 
 	// recv with wrong code
 	_, err = c1.Receive(ctx, fmt.Sprintf("%s-intermarrying-aliased", nameplate))
-	if err != errDecryptFailed {
-		t.Fatalf("Recv side expected decrypt failed due to wrong code but got: %s", err)
-	}
+	// require.ErrorIsf() would have been nice here
+	require.Equal(t, err, errDecryptFailed,
+		fmt.Sprintf("Recv side expected decrypt failed due to wrong code but got: %s", err))
 
 	status := <-statusChan
 	if status.OK || status.Error != errDecryptFailed {
@@ -71,15 +69,12 @@ func TestWormholeSendRecvText(t *testing.T) {
 	}
 
 	code, statusChan, err = c0.SendText(ctx, secretText)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 
 	// recv with correct code
 	msg, err := c1.Receive(ctx, code)
-	if err != nil {
-		t.Fatalf("Recv side got unexpected err: %s", err)
-	}
+	require.Nil(t, err,
+		fmt.Sprintf("Recv side got unexpected err: %s", err))
 
 	msgBody, err := ioutil.ReadAll(msg)
 	if err != nil {
