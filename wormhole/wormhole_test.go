@@ -754,8 +754,7 @@ func TestClient_relayURL_default(t *testing.T) {
 	}
 }
 
-// if TransitRelayAddress is set, then it is used instead of
-// TransitRelayURL
+// if TransitRelayAddress is set, then it is used instead of TransitRelayURL
 func TestClient_relayURL_relayAddress(t *testing.T) {
 	var c Client
 

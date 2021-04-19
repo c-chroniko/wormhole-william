@@ -97,18 +97,14 @@ func (c *Client) wordCount() int {
 }
 
 func (c *Client) relayURL() internal.SimpleURL {
-	if c.TransitRelayAddress != "" {
-		relayUrl, err := internal.NewSimpleURL(c.TransitRelayAddress)
-		if err != nil {
-			return relayUrl
-		} else {
-			errors.New("Malformed Transit Relay Address")
-		}
-	}
-	if c.TransitRelayURL != "" {
+	switch {
+	case c.TransitRelayAddress != "":
+		return internal.MustNewSimpleURL(c.TransitRelayAddress)
+	case c.TransitRelayURL != "":
 		return internal.MustNewSimpleURL(c.TransitRelayURL)
+	default:
+		return internal.MustNewSimpleURL(DefaultTransitRelayURL)
 	}
-	return internal.MustNewSimpleURL(DefaultTransitRelayURL)
 }
 
 // SendResult has information about whether or not a Send command was successful.
