@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/klauspost/compress/zip"
 	"github.com/psanford/wormhole-william/rendezvous/rendezvousservertest"
+	"github.com/stretchr/testify/require"
 	"nhooyr.io/websocket"
 )
 
@@ -747,11 +749,16 @@ func (ts *testRelayServer) handleConn(c net.Conn) {
 func TestClient_relayURL_default(t *testing.T) {
 	var c Client
 
-	DefaultTransitRelayURL = "tcp:transit.magic-wormhole.io:8001"
-	p := c.relayURL().Proto
-	if p != "tcp" {
-		t.Error(fmt.Sprintf("invalid protocol, expected tcp, got %v", p))
-	}
+	expectedProto := "tcp"
+	expectedHost := "transit.magic-wormhole.io"
+	expectedPort := "8001"
+
+	DefaultTransitRelayURL = strings.Join([]string{expectedProto, expectedHost, expectedPort}, ":")
+	url := c.relayURL()
+
+	require.Equal(t, expectedProto, url.Proto)
+	require.Equal(t, expectedHost, url.Host)
+	require.Equal(t, expectedPort, strconv.Itoa(url.Port))
 }
 
 // if TransitRelayAddress is set, then it is used instead of TransitRelayURL
@@ -760,16 +767,20 @@ func TestClient_relayURL_relayAddress(t *testing.T) {
 
 	// transitRelayAddress is in host:port format
 	// protocol is assumed as "tcp".
-	c.TransitRelayAddress = "transit.magic-wormhole.io:4001"
+	expectedProto := "tcp"
+	expectedHost := "transit.magic-wormhole.io"
+	expectedPort := "4001"
+
+	// omit protocol
+	c.TransitRelayAddress = strings.Join([]string{expectedHost, expectedPort}, ":")
 
 	// if proto field is empty in the input string, then
 	// relayURL() would deduce it as "tcp".
 	url := c.relayURL()
 
-	expectedProto := "tcp"
-	if url.Proto != expectedProto {
-		t.Error(fmt.Sprintf("invalid protocol, expected %v, got %v", expectedProto, url.Proto))
-	}
+	require.Equal(t, expectedProto, url.Proto)
+	require.Equal(t, expectedHost, url.Host)
+	require.Equal(t, expectedPort, strconv.Itoa(url.Port))
 }
 
 func TestWormholeFileTransportSendRecvViaWSRelayServer(t *testing.T) {
