@@ -386,9 +386,7 @@ func TestWormholeFileTransportRecvMidStreamCancel(t *testing.T) {
 	require.NotNil(t, err)
 
 	result := <-resultCh
-	if result.OK {
-		t.Fatalf("Expected error result but got ok")
-	}
+	require.False(t, result.OK)
 }
 
 func TestWormholeFileTransportSendMidStreamCancel(t *testing.T) {
