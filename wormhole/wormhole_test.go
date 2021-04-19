@@ -77,9 +77,8 @@ func TestWormholeSendRecvText(t *testing.T) {
 		fmt.Sprintf("Recv side got unexpected err: %s", err))
 
 	msgBody, err := ioutil.ReadAll(msg)
-	if err != nil {
-		t.Fatalf("Recv side got read err: %s", err)
-	}
+	require.Nil(t, err,
+		fmt.Sprintf("Recv side got read err: %s", err))
 
 	if string(msgBody) != secretText {
 		t.Fatalf("Got Message does not match sent secret got=%s sent=%s", msgBody, secretText)
