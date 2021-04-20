@@ -751,7 +751,7 @@ func TestClient_relayURL_default(t *testing.T) {
 
 	expectedProto := "tcp"
 	expectedHost := "transit.magic-wormhole.io"
-	expectedPort := "8001"
+	expectedPort := "4001"
 
 	DefaultTransitRelayURL = strings.Join([]string{expectedProto, expectedHost, expectedPort}, ":")
 	url := c.relayURL()
