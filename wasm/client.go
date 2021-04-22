@@ -5,6 +5,7 @@ package wasm
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"syscall/js"
@@ -133,13 +134,14 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 		}
 
 		var code string
+		var resultChan chan SendResult
 		if len(args) == 4 && !args[3].IsUndefined() {
 			withProgress := wormhole.WithProgress(func(sentBytes int64, totalBytes int64) {
 				args[3].Invoke(sentBytes, totalBytes)
 			})
-			code, _, err = client.SendFile(ctx, fileName, fileReader, withProgress)
+			code, resultChan, err = client.SendFile(ctx, fileName, fileReader, withProgress)
 		} else {
-			code, _, err = client.SendFile(ctx, fileName, fileReader)
+			code, resultChan, err = client.SendFile(ctx, fileName, fileReader)
 		}
 		if err != nil {
 			reject(err)

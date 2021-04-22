@@ -490,12 +490,11 @@ func (t *fileTransport) listen() error {
 	return nil
 }
 
-func (t *fileTransport) listenRelay() error {
+func (t *fileTransport) listenRelay() (err error) {
 
 	ctx := context.Background()
 
 	var conn net.Conn
-	var err error
 	switch t.relayURL.Proto {
 	case "tcp":
 		// NB: don't dial the relay if we don't have an address.
@@ -509,13 +508,21 @@ func (t *fileTransport) listenRelay() error {
 	case "ws", "wss", "http", "https":
 		c, _, err := websocket.Dial(ctx, t.relayURL.String(), nil)
 		if err != nil {
-			fmt.Errorf("websocket.Dial failed")
+			return fmt.Errorf("websocket.Dial failed")
 		}
 		conn = websocket.NetConn(ctx, c, websocket.MessageBinary)
 	default:
 		return fmt.Errorf("%w: %s", UnsupportedProtocolErr, t.relayURL.Proto)
 	}
 
+	// TODO: obsolete
+	defer func() {
+		if err := recover(); err != nil {
+			err = errors.New("unable to connect to the relay server")
+		}
+	}()
+	// TODO: fix
+	// NB: panics if websocket server is not listening.
 	_, err = conn.Write(t.relayHandshakeHeader())
 	if err != nil {
 		conn.Close()
