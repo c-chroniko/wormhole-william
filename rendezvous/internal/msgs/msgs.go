@@ -8,11 +8,21 @@ type Welcome struct {
 }
 
 type WelcomeServerInfo struct {
-	MOTD              string `json:"motd"`
-	CurrentCLIVersion string `json:"current_cli_version"`
-	Error             string `json:"error"`
+	MOTD               string `json:"motd"`
+	CurrentCLIVersion  string `json:"current_cli_version"`
+	Error              string `json:"error"`
+	PermissionRequired *PermissionRequiredInfo `json:"permission-required"`
 }
 
+type PermissionRequiredInfo struct {
+	None               struct{}     `json:"none"`
+	HashCash           HashCashInfo `json:"hashcash"`
+}
+
+type HashCashInfo struct {
+	Bits               uint32 `json:"bits"`
+	Resource           string `json:"resource"`
+}
 // Client sent bind message
 type Bind struct {
 	Type  string `json:"type" rendezvous_value:"bind"`
