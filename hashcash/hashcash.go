@@ -9,7 +9,7 @@ import (
 
 type Stamp struct {
 	Version  int
-	Bits     int
+	Bits     uint
 	Date     string
 	Resource string
 	Rand     string
@@ -20,7 +20,7 @@ func (stamp Stamp) String() string {
 	return fmt.Sprintf("%d:%d:%s:%s::%s:%s", stamp.Version, stamp.Bits, stamp.Date, stamp.Resource, stamp.Rand, stamp.Counter)
 }
 
-func Mint(bits int, resource string) (string, error) {
+func Mint(bits uint, resource string) (string, error) {
 	b := make([]byte, 12)
 	counter := 0
 	timestamp := "210623"
@@ -44,7 +44,7 @@ func Mint(bits int, resource string) (string, error) {
 	return "", fmt.Errorf("could not mint a stamp for %d bits and resource \"%s\"", bits, resource)
 }
 
-func Valid(stamp string, bits int) bool {
+func Valid(stamp string, bits uint) bool {
 	buffer := bytes.NewBufferString(stamp)
 	hash := sha1.New()
 	sha1sum := hash.Sum(buffer.Bytes())
@@ -52,8 +52,8 @@ func Valid(stamp string, bits int) bool {
 	return leadingBits(sha1sum, bits)
 }
 
-func leadingBits(shasum []byte, requiredBits int) bool {
-	bits := 0
+func leadingBits(shasum []byte, requiredBits uint) bool {
+	bits := uint(0)
 	for _, b := range shasum {
 		if bits >= requiredBits {
 			return true
