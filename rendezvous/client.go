@@ -13,6 +13,7 @@ import (
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"github.com/psanford/wormhole-william/rendezvous/internal/msgs"
 	"github.com/psanford/wormhole-william/version"
+	"github.com/LeastAuthority/hashcash"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
@@ -119,6 +120,11 @@ func (c *Client) closeWithError(err error) {
 	c.err = err
 }
 
+const (
+	AuthTypeNone = iota
+	AuthTypeHashCash
+)
+
 type ConnectInfo struct {
 	MOTD              string
 	CurrentCLIVersion string
@@ -155,9 +161,32 @@ func (c *Client) Connect(ctx context.Context) (*ConnectInfo, error) {
 		return nil, err
 	}
 
-	if err := c.bind(ctx, c.sideID, c.appID); err != nil {
-		c.closeWithError(err)
-		return nil, err
+	permissionRequired := welcome.Welcome.PermissionRequired
+
+	// if permission-required key is not present in the Welcome
+	// message or if permission-required is none, then just send
+	// the plain old bind message
+	if permissionRequired == nil && permissionRequired.None == struct{}{} {
+		if err := c.bind(ctx, c.sideID, c.appID); err != nil {
+			c.closeWithError(err)
+			return nil, err
+		}
+	} else {
+		// hashcash: find the hashcash params, mint the
+		// corresponding stamp and send submit-permissions
+		// message.
+		requiredBits := permissionRequired.HashCash.Bits
+		resource := permissionRequired.HashCash.Resource
+
+		stamp, err := hashcash.Mint(requiredBits, resource)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := c.submitPermissions(ctx, stamp); err != nil {
+			c.closeWithError(err)
+			return nil, err
+		}
 	}
 
 	info := ConnectInfo{
@@ -528,6 +557,15 @@ func (c *Client) agentID() (string, string) {
 	}
 
 	return agent, v
+}
+
+func (c *Client) submitPermissions(ctx context.Context, stamp string) error {
+	submitPermissionsMsg := msgs.SubmitPermissions{
+		Method: "hashcash",
+		Stamp: stamp,
+	}
+	_, err := c.sendAndWait(ctx, &submitPermissionsMsg)
+	return err
 }
 
 func (c *Client) bind(ctx context.Context, side, appID string) error {

@@ -20,9 +20,17 @@ type PermissionRequiredInfo struct {
 }
 
 type HashCashInfo struct {
-	Bits               uint32 `json:"bits"`
+	Bits               uint   `json:"bits"`
 	Resource           string `json:"resource"`
 }
+
+
+type SubmitPermissions struct {
+	Type   string `json:"type" rendezvous_value:"submit-permission"`
+	Method string `json:"method"`
+	Stamp  string `json:"stamp"`
+}
+
 // Client sent bind message
 type Bind struct {
 	Type  string `json:"type" rendezvous_value:"bind"`
