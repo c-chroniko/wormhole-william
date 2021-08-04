@@ -8,22 +8,21 @@ type Welcome struct {
 }
 
 type WelcomeServerInfo struct {
-	MOTD               string `json:"motd"`
-	CurrentCLIVersion  string `json:"current_cli_version"`
-	Error              string `json:"error"`
+	MOTD               string                  `json:"motd"`
+	CurrentCLIVersion  string                  `json:"current_cli_version"`
+	Error              string                  `json:"error"`
 	PermissionRequired *PermissionRequiredInfo `json:"permission-required"`
 }
 
 type PermissionRequiredInfo struct {
-	None               struct{}     `json:"none"`
-	HashCash           *HashCashInfo `json:"hashcash"`
+	None     struct{}      `json:"none"`
+	HashCash *HashCashInfo `json:"hashcash"`
 }
 
 type HashCashInfo struct {
-	Bits               uint   `json:"bits"`
-	Resource           string `json:"resource"`
+	Bits     uint   `json:"bits"`
+	Resource string `json:"resource"`
 }
-
 
 type SubmitPermissions struct {
 	Type   string `json:"type" rendezvous_value:"submit-permissions"`

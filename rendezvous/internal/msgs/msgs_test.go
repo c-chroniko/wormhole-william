@@ -1,9 +1,9 @@
 package msgs
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
-	"encoding/json"
 )
 
 func TestStructTags(t *testing.T) {
@@ -29,7 +29,7 @@ func TestWelcomeMsgEncode(t *testing.T) {
 			PermissionRequired: &PermissionRequiredInfo{
 				None: struct{}{},
 				HashCash: &HashCashInfo{
-					Bits: 6,
+					Bits:     6,
 					Resource: "see description",
 				},
 			},
