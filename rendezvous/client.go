@@ -163,15 +163,11 @@ func (c *Client) Connect(ctx context.Context) (*ConnectInfo, error) {
 
 	permissionRequired := welcome.Welcome.PermissionRequired
 
-	// if permission-required key is not present in the Welcome
-	// message or if permission-required is none, then just send
-	// the plain old bind message
-	if permissionRequired == nil && permissionRequired.None == struct{}{} {
-		if err := c.bind(ctx, c.sideID, c.appID); err != nil {
-			c.closeWithError(err)
-			return nil, err
-		}
-	} else {
+	// if permission-required key is present in the Welcome
+	// message then send the submit-permissions message followed
+	// by the bind message. If not, skip the submit-permissions
+	// message and only send the bind message.
+	if permissionRequired != nil && permissionRequired.HashCash != nil {
 		// hashcash: find the hashcash params, mint the
 		// corresponding stamp and send submit-permissions
 		// message.
@@ -184,6 +180,14 @@ func (c *Client) Connect(ctx context.Context) (*ConnectInfo, error) {
 		}
 
 		if err := c.submitPermissions(ctx, stamp); err != nil {
+			c.closeWithError(err)
+			return nil, err
+		}
+	}
+
+	if (permissionRequired != nil && permissionRequired.None != struct{}{}) ||
+		permissionRequired == nil {
+		if err := c.bind(ctx, c.sideID, c.appID); err != nil {
 			c.closeWithError(err)
 			return nil, err
 		}

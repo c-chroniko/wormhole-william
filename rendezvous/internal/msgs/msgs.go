@@ -16,7 +16,7 @@ type WelcomeServerInfo struct {
 
 type PermissionRequiredInfo struct {
 	None               struct{}     `json:"none"`
-	HashCash           HashCashInfo `json:"hashcash"`
+	HashCash           *HashCashInfo `json:"hashcash"`
 }
 
 type HashCashInfo struct {
