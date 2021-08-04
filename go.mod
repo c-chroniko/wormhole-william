@@ -6,7 +6,6 @@ require (
 	github.com/LeastAuthority/hashcash v0.0.0-20210803130117-7f2bcfb469db
 	github.com/cheggaaa/pb/v3 v3.0.1
 	github.com/klauspost/compress v1.11.13
-	github.com/leanovate/gopter v0.2.9
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
