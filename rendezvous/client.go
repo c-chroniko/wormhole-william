@@ -185,8 +185,8 @@ func (c *Client) Connect(ctx context.Context) (*ConnectInfo, error) {
 		}
 	}
 
-	if (permissionRequired != nil && permissionRequired.None != struct{}{}) ||
-		permissionRequired == nil {
+	if permissionRequired == nil || permissionRequired.None == struct{}{} {
+		fmt.Printf("sending bind...\n")
 		if err := c.bind(ctx, c.sideID, c.appID); err != nil {
 			c.closeWithError(err)
 			return nil, err

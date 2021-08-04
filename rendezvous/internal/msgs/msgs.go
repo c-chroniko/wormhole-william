@@ -27,6 +27,7 @@ type HashCashInfo struct {
 
 type SubmitPermissions struct {
 	Type   string `json:"type" rendezvous_value:"submit-permission"`
+	ID     string `json:"id"`
 	Method string `json:"method"`
 	Stamp  string `json:"stamp"`
 }
