@@ -10,10 +10,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/LeastAuthority/hashcash"
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"github.com/psanford/wormhole-william/rendezvous/internal/msgs"
 	"github.com/psanford/wormhole-william/version"
-	"github.com/LeastAuthority/hashcash"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
@@ -565,7 +565,7 @@ func (c *Client) agentID() (string, string) {
 func (c *Client) submitPermissions(ctx context.Context, stamp string) error {
 	submitPermissionsMsg := msgs.SubmitPermissions{
 		Method: "hashcash",
-		Stamp: stamp,
+		Stamp:  stamp,
 	}
 	_, err := c.sendAndWait(ctx, &submitPermissionsMsg)
 	return err
