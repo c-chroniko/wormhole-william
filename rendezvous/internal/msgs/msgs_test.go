@@ -28,7 +28,7 @@ func TestWelcomeMsgEncode(t *testing.T) {
 			MOTD: "motd",
 			PermissionRequired: &PermissionRequiredInfo{
 				None: struct{}{},
-				HashCash: HashCashInfo{
+				HashCash: &HashCashInfo{
 					Bits: 6,
 					Resource: "see description",
 				},
