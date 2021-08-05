@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"crypto/sha1"
+	"bytes"
 
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"github.com/psanford/wormhole-william/rendezvous/internal/msgs"
@@ -181,9 +183,17 @@ func (ts *TestServer) handleWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	requiredBits := uint(6)
 	welcome := &msgs.Welcome{
 		Welcome: msgs.WelcomeServerInfo{
 			MOTD: TestMotd,
+			PermissionRequired: &msgs.PermissionRequiredInfo{
+				None: struct{}{},
+				HashCash: &msgs.HashCashInfo{
+					Bits: requiredBits,
+					Resource: "test-resource",
+				},
+			},
 		},
 	}
 	sendMsg(welcome)
@@ -215,6 +225,7 @@ func (ts *TestServer) handleWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	permissionGranted := false
 	for {
 		_, msgBytes, err := c.Read(ctx)
 		if _, isCloseErr := err.(*websocket.CloseError); err == io.EOF || isCloseErr {
@@ -229,6 +240,31 @@ func (ts *TestServer) handleWS(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch m := msg.(type) {
+		case *msgs.SubmitPermissions:
+			ackMsg(m.ID)
+			if m.Method != "hashcash" {
+				// send an error message to the client
+				errMsg(m.ID, m, fmt.Errorf("unknown permission method %s", m.Method))
+			}
+			// if hashcash and if the hash doesn't match, send error too.
+			if m.Method == "hashcash" {
+				// extract stamp and find its sha1
+				// find leading zeros in the calculated sha1
+				// check if that is greater than required number of zeros
+				// if not, send an error and close the connection
+				stamp := m.Stamp
+				buffer := bytes.NewBufferString(stamp)
+				stampHash := sha1.Sum(buffer.Bytes())
+				actualNumZeros := countLeadingZeros(stampHash[:])
+				if actualNumZeros >= requiredBits {
+					permissionGranted = true
+				} else {
+					// send an error to the client and close the connection
+					errMsg(m.ID, m, fmt.Errorf("Bad stamp, permission denied"))
+					continue
+				}
+			}
+
 		case *msgs.Bind:
 			if sideID != "" {
 				ackMsg(m.ID)
@@ -241,13 +277,19 @@ func (ts *TestServer) handleWS(w http.ResponseWriter, r *http.Request) {
 				errMsg(m.ID, m, fmt.Errorf("bind requires 'side'"))
 				continue
 			}
-
 			ts.mu.Lock()
 			ts.agents = append(ts.agents, m.ClientVersion)
 			ts.mu.Unlock()
 			sideID = m.Side
 
 			ackMsg(m.ID)
+			if !permissionGranted {
+				errMsg(m.ID, m, fmt.Errorf("must send submit-permission first"))
+				// server should actually close the
+				// connection if submit-permission is
+				// not sent before bind message.
+				continue
+			}
 		case *msgs.Allocate:
 			ackMsg(m.ID)
 
@@ -393,4 +435,24 @@ func (ts *TestServer) handleWS(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Test server got unexpected message: %v", msg)
 		}
 	}
+}
+
+func countLeadingZeros(buf []byte) uint {
+	var zCount uint
+	for _, b := range buf {
+		if b == 0 {
+			zCount += 8
+		} else {
+			var mask byte
+			mask = 1 << 7
+			for i := 0; i < 8; i++ {
+				if (byte(b) & mask) != 0 {
+					return (zCount + uint(i))
+				}
+				mask = mask >> 1
+			}
+		}
+	}
+
+	return zCount
 }
