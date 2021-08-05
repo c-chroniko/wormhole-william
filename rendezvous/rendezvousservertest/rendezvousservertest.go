@@ -2,6 +2,8 @@ package rendezvousservertest
 
 import (
 	"context"
+	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,8 +17,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"crypto/sha1"
-	"bytes"
 
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"github.com/psanford/wormhole-william/rendezvous/internal/msgs"
@@ -190,7 +190,7 @@ func (ts *TestServer) handleWS(w http.ResponseWriter, r *http.Request) {
 			PermissionRequired: &msgs.PermissionRequiredInfo{
 				None: struct{}{},
 				HashCash: &msgs.HashCashInfo{
-					Bits: requiredBits,
+					Bits:     requiredBits,
 					Resource: "test-resource",
 				},
 			},
