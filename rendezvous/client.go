@@ -173,7 +173,9 @@ func (c *Client) Connect(ctx context.Context) (*ConnectInfo, error) {
 
 	// prioritize "none". i.e. if server does not require
 	// permissions, connect without permissions stamp.
-	if permissionRequired == nil || permissionRequired.None == struct{}{} {
+	if permissionRequired == nil ||
+		(permissionRequired.None != nil &&
+			*permissionRequired.None == struct{}{}) {
 		// no permission required, send bind
 		if err := c.bind(ctx, c.sideID, c.appID); err != nil {
 			c.closeWithError(err)

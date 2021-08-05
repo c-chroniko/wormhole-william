@@ -63,7 +63,7 @@ func NewServerWithPermNone() *TestServer {
 		Welcome: msgs.WelcomeServerInfo{
 			MOTD: TestMotd,
 			PermissionRequired: &msgs.PermissionRequiredInfo{
-				None: struct{}{},
+				None: &struct{}{},
 			},
 		},
 		ServerTX: 0,
@@ -84,7 +84,32 @@ func NewServerWithPermNoneAndHashcash() *TestServer {
 		Welcome: msgs.WelcomeServerInfo{
 			MOTD: TestMotd,
 			PermissionRequired: &msgs.PermissionRequiredInfo{
-				None: struct{}{},
+				None: &struct{}{},
+				HashCash: &msgs.HashCashInfo{
+					Bits: 20,
+					Resource: "foobarbaz",
+				},
+			},
+		},
+		ServerTX: 0,
+	}))
+
+	ts.Server = httptest.NewServer(smux)
+	return ts
+}
+
+// only supports permissioned connections with HashCash
+func NewServerWithPermHashcash() *TestServer {
+	ts := &TestServer{
+		mailboxes:  make(map[string]*mailbox),
+		nameplates: make(map[int16]string),
+	}
+
+	smux := http.NewServeMux()
+	smux.HandleFunc("/ws", ts.withWelcome(&msgs.Welcome{
+		Welcome: msgs.WelcomeServerInfo{
+			MOTD: TestMotd,
+			PermissionRequired: &msgs.PermissionRequiredInfo{
 				HashCash: &msgs.HashCashInfo{
 					Bits: 20,
 					Resource: "foobarbaz",
@@ -274,8 +299,10 @@ func (ts *TestServer) withWelcome(welcomeMsg *msgs.Welcome) func(http.ResponseWr
 
 		permissionGranted := false
 		if welcomeMsg.Welcome.PermissionRequired != nil {
-			if welcomeMsg.Welcome.PermissionRequired.None == struct{}{} {
-				permissionGranted = true
+			if welcomeMsg.Welcome.PermissionRequired.None != nil {
+				if *welcomeMsg.Welcome.PermissionRequired.None == struct{}{} {
+					permissionGranted = true
+				}
 			}
 		}
 		for {

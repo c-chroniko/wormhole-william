@@ -194,3 +194,31 @@ func TestConnectWithPermissionsNoneAndHashcash(t *testing.T) {
 		t.Fatalf("Server does not expect permissions, but client connected with permission")
 	}
 }
+
+// test permission with a server that only supports HashCash in which
+// case, client should be able to connect only with proper
+// permissions.
+func TestConnectWithPermissionsHashcash(t *testing.T) {
+	ts := rendezvousservertest.NewServerWithPermHashcash()
+	defer ts.Close()
+
+	side0 := crypto.RandSideID()
+	appID := "superlatively-abbeys"
+
+	c0 := NewClient(ts.WebSocketURL(), side0, appID)
+
+	ctx := context.Background()
+
+	info, err := c0.Connect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if info.MOTD != rendezvousservertest.TestMotd {
+		t.Fatalf("MOTD got=%s expected=%s", info.MOTD, rendezvousservertest.TestMotd)
+	}
+
+	if info.PermType != PermTypeHashCash {
+		t.Fatalf("Server expects permissions, but client connected without permissions")
+	}
+}

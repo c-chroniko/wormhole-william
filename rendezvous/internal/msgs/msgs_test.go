@@ -27,7 +27,7 @@ func TestWelcomeMsgEncode(t *testing.T) {
 		Welcome: WelcomeServerInfo{
 			MOTD: "motd",
 			PermissionRequired: &PermissionRequiredInfo{
-				None: struct{}{},
+				None: &struct{}{},
 				HashCash: &HashCashInfo{
 					Bits:     6,
 					Resource: "see description",
@@ -47,7 +47,7 @@ func TestWelcomeMsgEncode(t *testing.T) {
 		t.Errorf("welcome msg: error parsing message")
 	}
 
-	if unM.Welcome.PermissionRequired.None != struct{}{} {
+	if *unM.Welcome.PermissionRequired.None != struct{}{} {
 		t.Errorf("permission-required: incorrect encoding")
 	}
 

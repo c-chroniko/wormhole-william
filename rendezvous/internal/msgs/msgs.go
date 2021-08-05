@@ -15,7 +15,7 @@ type WelcomeServerInfo struct {
 }
 
 type PermissionRequiredInfo struct {
-	None     struct{}      `json:"none"`
+	None     *struct{}      `json:"none,omitempty"`
 	HashCash *HashCashInfo `json:"hashcash"`
 }
 
