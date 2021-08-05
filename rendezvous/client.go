@@ -121,7 +121,8 @@ func (c *Client) closeWithError(err error) {
 }
 
 const (
-	PermTypeNone = iota
+	PermTypeUnsupported = iota
+	PermTypeNone
 	PermTypeHashCash
 )
 
@@ -173,6 +174,7 @@ func (c *Client) Connect(ctx context.Context) (*ConnectInfo, error) {
 	// prioritize "none". i.e. if server does not require
 	// permissions, connect without permissions stamp.
 	if permissionRequired == nil || permissionRequired.None == struct{}{} {
+		// no permission required, send bind
 		if err := c.bind(ctx, c.sideID, c.appID); err != nil {
 			c.closeWithError(err)
 			return nil, err
@@ -185,13 +187,14 @@ func (c *Client) Connect(ctx context.Context) (*ConnectInfo, error) {
 		// message.
 		requiredBits := permissionRequired.HashCash.Bits
 		resource := permissionRequired.HashCash.Resource
+		method := "hashcash"
 
 		stamp, err := hashcash.Mint(requiredBits, resource)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := c.submitPermissions(ctx, stamp); err != nil {
+		if err := c.submitPermissions(ctx, method, stamp); err != nil {
 			c.closeWithError(err)
 			return nil, err
 		}
@@ -202,6 +205,9 @@ func (c *Client) Connect(ctx context.Context) (*ConnectInfo, error) {
 			c.closeWithError(err)
 			return nil, err
 		}
+	} else {
+		// unsupported permission method
+		c.closeWithError(fmt.Errorf("unsupported permission method"))
 	}
 
 	info := ConnectInfo{
@@ -575,9 +581,9 @@ func (c *Client) agentID() (string, string) {
 	return agent, v
 }
 
-func (c *Client) submitPermissions(ctx context.Context, stamp string) error {
+func (c *Client) submitPermissions(ctx context.Context, method string, stamp string) error {
 	submitPermissionsMsg := msgs.SubmitPermissions{
-		Method: "hashcash",
+		Method: method,
 		Stamp:  stamp,
 	}
 	_, err := c.sendAndWait(ctx, &submitPermissionsMsg)

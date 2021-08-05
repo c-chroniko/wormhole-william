@@ -11,7 +11,7 @@ import (
 )
 
 func TestBasicClient(t *testing.T) {
-	ts := rendezvousservertest.NewServer()
+	ts := rendezvousservertest.NewServerLegacy()
 	defer ts.Close()
 
 	side0 := crypto.RandSideID()
@@ -112,7 +112,7 @@ func TestBasicClient(t *testing.T) {
 }
 
 func TestCustomUserAgent(t *testing.T) {
-	ts := rendezvousservertest.NewServer()
+	ts := rendezvousservertest.NewServerLegacy()
 	defer ts.Close()
 
 	side0 := crypto.RandSideID()
@@ -144,7 +144,7 @@ func TestCustomUserAgent(t *testing.T) {
 // test with a server that supports permission methods "none" as well
 // as "hashcash", in which case, connect with no permissions.
 func TestPermissionsNone(t *testing.T) {
-	ts := rendezvousservertest.NewServer()
+	ts := rendezvousservertest.NewServerWithPermNone()
 	defer ts.Close()
 
 	side0 := crypto.RandSideID()
