@@ -140,3 +140,110 @@ func TestCustomUserAgent(t *testing.T) {
 
 	c0.Close(ctx, "")
 }
+
+// test with a server that supports permission methods "none" as well
+// as "hashcash", in which case, connect with no permissions.
+func TestPermissionsNone(t *testing.T) {
+	ts := rendezvousservertest.NewServer()
+	defer ts.Close()
+
+	side0 := crypto.RandSideID()
+	side1 := crypto.RandSideID()
+	appID := "superlatively-abbeys"
+
+	c0 := NewClient(ts.WebSocketURL(), side0, appID)
+
+	ctx := context.Background()
+
+	info, err := c0.Connect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if info.MOTD != rendezvousservertest.TestMotd {
+		t.Fatalf("MOTD got=%s expected=%s", info.MOTD, rendezvousservertest.TestMotd)
+	}
+
+	if info.PermType != PermTypeNone {
+		t.Fatalf("Server does not expect permissions, but client connected with permission")
+	}
+
+	gotAgents := ts.Agents()
+	expectAgents := [][]string{
+		{version.AgentString, version.AgentVersion},
+	}
+
+	if !reflect.DeepEqual(gotAgents, expectAgents) {
+		t.Fatalf("got agents=%v expected=%v", gotAgents, expectAgents)
+	}
+
+	nameplate, err := c0.CreateMailbox(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c1 := NewClient(ts.WebSocketURL(), side1, appID)
+	_, err = c1.Connect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = c1.AttachMailbox(ctx, nameplate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	phase0 := "seacoasts-demonstrator"
+	body0 := "Roquefort-Gilligan"
+
+	err = c0.AddMessage(ctx, phase0, body0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c0Msgs := c0.MsgChan(ctx)
+	c1Msgs := c1.MsgChan(ctx)
+
+	msg := <-c1Msgs
+
+	expectMsg := MailboxEvent{
+		Side:  side0,
+		Phase: phase0,
+		Body:  body0,
+	}
+
+	if !reflect.DeepEqual(expectMsg, msg) {
+		t.Fatalf("Message mismatch got=%+v, expect=%+v", msg, expectMsg)
+	}
+
+	select {
+	case m := <-c0Msgs:
+		t.Fatalf("c0 got message when it wasn't expecting one: %+v", m)
+	default:
+	}
+
+	phase1 := "fundamentalists-potluck"
+	body1 := "sanitarium-seasonings"
+	err = c1.AddMessage(ctx, phase1, body1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg = <-c0Msgs
+
+	expectMsg = MailboxEvent{
+		Side:  side1,
+		Phase: phase1,
+		Body:  body1,
+	}
+
+	if !reflect.DeepEqual(expectMsg, msg) {
+		t.Fatalf("Message mismatch got=%+v, expect=%+v", msg, expectMsg)
+	}
+
+	select {
+	case m := <-c1Msgs:
+		t.Fatalf("c1 got message when it wasn't expecting one: %+v", m)
+	default:
+	}
+}
