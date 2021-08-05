@@ -86,7 +86,7 @@ func NewServerWithPermNoneAndHashcash() *TestServer {
 			PermissionRequired: &msgs.PermissionRequiredInfo{
 				None: &struct{}{},
 				HashCash: &msgs.HashCashInfo{
-					Bits: 20,
+					Bits:     20,
 					Resource: "foobarbaz",
 				},
 			},
@@ -111,7 +111,7 @@ func NewServerWithPermHashcash() *TestServer {
 			MOTD: TestMotd,
 			PermissionRequired: &msgs.PermissionRequiredInfo{
 				HashCash: &msgs.HashCashInfo{
-					Bits: 20,
+					Bits:     20,
 					Resource: "foobarbaz",
 				},
 			},
