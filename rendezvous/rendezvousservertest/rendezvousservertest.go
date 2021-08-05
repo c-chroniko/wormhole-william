@@ -73,6 +73,31 @@ func NewServerWithPermNone() *TestServer {
 	return ts
 }
 
+func NewServerWithPermNoneAndHashcash() *TestServer {
+	ts := &TestServer{
+		mailboxes:  make(map[string]*mailbox),
+		nameplates: make(map[int16]string),
+	}
+
+	smux := http.NewServeMux()
+	smux.HandleFunc("/ws", ts.withWelcome(&msgs.Welcome{
+		Welcome: msgs.WelcomeServerInfo{
+			MOTD: TestMotd,
+			PermissionRequired: &msgs.PermissionRequiredInfo{
+				None: struct{}{},
+				HashCash: &msgs.HashCashInfo{
+					Bits: 20,
+					Resource: "foobarbaz",
+				},
+			},
+		},
+		ServerTX: 0,
+	}))
+
+	ts.Server = httptest.NewServer(smux)
+	return ts
+}
+
 func (ts *TestServer) Agents() [][]string {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
