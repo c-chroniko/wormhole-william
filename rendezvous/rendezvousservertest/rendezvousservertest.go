@@ -73,7 +73,6 @@ func NewServerWithPermNone() *TestServer {
 	return ts
 }
 
-
 func (ts *TestServer) Agents() [][]string {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
@@ -214,7 +213,7 @@ func (ts *TestServer) withWelcome(welcomeMsg *msgs.Welcome) func(http.ResponseWr
 
 		if welcomeMsg.Welcome.PermissionRequired != nil {
 			if welcomeMsg.Welcome.PermissionRequired.HashCash != nil {
-				requiredBits =  welcomeMsg.Welcome.PermissionRequired.HashCash.Bits
+				requiredBits = welcomeMsg.Welcome.PermissionRequired.HashCash.Bits
 				method = "hashcash"
 			}
 		}
