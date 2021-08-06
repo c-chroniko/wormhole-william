@@ -349,6 +349,7 @@ func (ts *TestServer) withWelcome(welcomeMsg *msgs.Welcome) func(http.ResponseWr
 					}
 				default:
 					errMsg(m.ID, m, fmt.Errorf("unsupported protocol: %v", method))
+					continue
 				}
 			case *msgs.Bind:
 				if sideID != "" {
