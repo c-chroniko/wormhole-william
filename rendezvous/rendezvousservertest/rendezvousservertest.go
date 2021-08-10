@@ -1,9 +1,6 @@
 package rendezvousservertest
 
 import (
-	"context"
-	"bytes"
-	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +19,7 @@ import (
 	"github.com/psanford/wormhole-william/rendezvous/internal/msgs"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
+	"github.com/LeastAuthority/hashcash"
 )
 
 type TestServer struct {
@@ -336,14 +334,13 @@ func (ts *TestServer) withWelcome(welcomeMsg *msgs.Welcome) func(http.ResponseWr
 						// check if that is greater than required number of zeros
 						// if not, send an error and close the connection
 						stamp := m.Stamp
-						buffer := bytes.NewBufferString(stamp)
-						stampHash := sha1.Sum(buffer.Bytes())
-						actualNumZeros := countLeadingZeros(stampHash[:])
-						if actualNumZeros >= requiredBits {
+						resource := welcomeMsg.Welcome.PermissionRequired.HashCash.Resource
+						v, err := hashcash.Evaluate(stamp, requiredBits, resource, 0)
+						if v {
 							permissionGranted = true
 						} else {
 							// send an error to the client and close the connection
-							errMsg(m.ID, m, fmt.Errorf("Bad stamp, permission denied"))
+							errMsg(m.ID, m, fmt.Errorf("Bad stamp, permission denied: %v", err))
 							continue
 						}
 					}
@@ -522,24 +519,4 @@ func (ts *TestServer) withWelcome(welcomeMsg *msgs.Welcome) func(http.ResponseWr
 			}
 		}
 	}
-}
-
-func countLeadingZeros(buf []byte) uint {
-	var zCount uint
-	for _, b := range buf {
-		if b == 0 {
-			zCount += 8
-		} else {
-			var mask byte
-			mask = 1 << 7
-			for i := 0; i < 8; i++ {
-				if (byte(b) & mask) != 0 {
-					return (zCount + uint(i))
-				}
-				mask = mask >> 1
-			}
-		}
-	}
-
-	return zCount
 }

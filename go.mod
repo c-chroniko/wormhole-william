@@ -3,7 +3,7 @@ module github.com/psanford/wormhole-william
 go 1.12
 
 require (
-	github.com/LeastAuthority/hashcash v0.0.0-20210803130117-7f2bcfb469db
+	github.com/LeastAuthority/hashcash v0.0.0-20210810065817-5a4897056c24
 	github.com/cheggaaa/pb/v3 v3.0.1
 	github.com/klauspost/compress v1.11.13
 	github.com/spf13/cobra v1.1.3
