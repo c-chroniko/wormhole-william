@@ -1,7 +1,6 @@
 package rendezvousservertest
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
+	"github.com/LeastAuthority/hashcash"
+	"github.com/gorilla/websocket"
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"github.com/psanford/wormhole-william/rendezvous/internal/msgs"
 )
@@ -30,14 +29,92 @@ type TestServer struct {
 	agents     [][]string
 }
 
-func NewServer() *TestServer {
+var TestMotd = "ordure-posts"
+
+func NewServerLegacy() *TestServer {
 	ts := &TestServer{
 		mailboxes:  make(map[string]*mailbox),
 		nameplates: make(map[int16]string),
 	}
 
 	smux := http.NewServeMux()
-	smux.HandleFunc("/ws", ts.handleWS)
+	smux.HandleFunc("/ws", ts.withWelcome(&msgs.Welcome{
+		Welcome: msgs.WelcomeServerInfo{
+			MOTD: TestMotd,
+		},
+		ServerTX: 0,
+	}))
+
+	ts.Server = httptest.NewServer(smux)
+	return ts
+}
+
+func NewServerWithPermNone() *TestServer {
+	ts := &TestServer{
+		mailboxes:  make(map[string]*mailbox),
+		nameplates: make(map[int16]string),
+	}
+
+	smux := http.NewServeMux()
+	smux.HandleFunc("/ws", ts.withWelcome(&msgs.Welcome{
+		Welcome: msgs.WelcomeServerInfo{
+			MOTD: TestMotd,
+			PermissionRequired: &msgs.PermissionRequiredInfo{
+				None: &struct{}{},
+			},
+		},
+		ServerTX: 0,
+	}))
+
+	ts.Server = httptest.NewServer(smux)
+	return ts
+}
+
+func NewServerWithPermNoneAndHashcash() *TestServer {
+	ts := &TestServer{
+		mailboxes:  make(map[string]*mailbox),
+		nameplates: make(map[int16]string),
+	}
+
+	smux := http.NewServeMux()
+	smux.HandleFunc("/ws", ts.withWelcome(&msgs.Welcome{
+		Welcome: msgs.WelcomeServerInfo{
+			MOTD: TestMotd,
+			PermissionRequired: &msgs.PermissionRequiredInfo{
+				None: &struct{}{},
+				HashCash: &msgs.HashCashInfo{
+					Bits:     20,
+					Resource: "foobarbaz",
+				},
+			},
+		},
+		ServerTX: 0,
+	}))
+
+	ts.Server = httptest.NewServer(smux)
+	return ts
+}
+
+// only supports permissioned connections with HashCash
+func NewServerWithPermHashcash() *TestServer {
+	ts := &TestServer{
+		mailboxes:  make(map[string]*mailbox),
+		nameplates: make(map[int16]string),
+	}
+
+	smux := http.NewServeMux()
+	smux.HandleFunc("/ws", ts.withWelcome(&msgs.Welcome{
+		Welcome: msgs.WelcomeServerInfo{
+			MOTD: TestMotd,
+			PermissionRequired: &msgs.PermissionRequiredInfo{
+				HashCash: &msgs.HashCashInfo{
+					Bits:     20,
+					Resource: "foobarbaz",
+				},
+			},
+		},
+		ServerTX: 0,
+	}))
 
 	ts.Server = httptest.NewServer(smux)
 	return ts
@@ -104,6 +181,11 @@ type mboxMsg struct {
 	body  string
 }
 
+var wsUpgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
 func prepareServerMsg(msg interface{}) {
 	ptr := reflect.TypeOf(msg)
 
@@ -159,202 +241,239 @@ func serverUnmarshal(m []byte) (interface{}, error) {
 	return resultPtr, nil
 }
 
-var TestMotd = "ordure-posts"
-
-func (ts *TestServer) handleWS(w http.ResponseWriter, r *http.Request) {
-	c, err := websocket.Accept(w, r, nil)
-	if err != nil {
-		panic(err)
-	}
-	defer c.Close(websocket.StatusInternalError, "testserver: upgrade to websocket mode failed")
-
-	ctx := context.Background()
-
-	var sendMu sync.Mutex
-	sendMsg := func(msg interface{}) {
-		prepareServerMsg(msg)
-		sendMu.Lock()
-		defer sendMu.Unlock()
-		err = wsjson.Write(ctx, c, msg)
+func (ts *TestServer) withWelcome(welcomeMsg *msgs.Welcome) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c, err := wsUpgrader.Upgrade(w, r, nil)
 		if err != nil {
 			panic(err)
 		}
-	}
+		defer c.Close()
 
-	welcome := &msgs.Welcome{
-		Welcome: msgs.WelcomeServerInfo{
-			MOTD: TestMotd,
-		},
-	}
-	sendMsg(welcome)
-
-	ackMsg := func(id string) {
-		ack := &msgs.Ack{
-			ID: id,
-		}
-		sendMsg(ack)
-	}
-
-	errMsg := func(id string, orig interface{}, reason error) {
-		errPacket := &msgs.Error{
-			Error: reason.Error(),
-			Orig:  orig,
-		}
-
-		sendMsg(errPacket)
-	}
-
-	var sideID string
-	var openMailbox *mailbox
-
-	defer func() {
-		if sideID != "" && openMailbox != nil {
-			openMailbox.Lock()
-			delete(openMailbox.clients, sideID)
-			openMailbox.Unlock()
-		}
-	}()
-
-	for {
-		_, msgBytes, err := c.Read(ctx)
-		if _, isCloseErr := err.(*websocket.CloseError); err == io.EOF || isCloseErr {
-			break
-		} else if err != nil {
-			panic(err)
-		}
-
-		msg, err := serverUnmarshal(msgBytes)
-		if err != nil {
-			panic(fmt.Sprintf("err: %s msg: %s", err, msgBytes))
-		}
-
-		switch m := msg.(type) {
-		case *msgs.Bind:
-			if sideID != "" {
-				ackMsg(m.ID)
-				errMsg(m.ID, m, fmt.Errorf("already bound"))
-				continue
-			}
-
-			if m.Side == "" {
-				ackMsg(m.ID)
-				errMsg(m.ID, m, fmt.Errorf("bind requires 'side'"))
-				continue
-			}
-
-			ts.mu.Lock()
-			ts.agents = append(ts.agents, m.ClientVersion)
-			ts.mu.Unlock()
-			sideID = m.Side
-
-			ackMsg(m.ID)
-		case *msgs.Allocate:
-			ackMsg(m.ID)
-
-			var nameplate int16
-			ts.mu.Lock()
-			for i := int16(1); i < math.MaxInt16; i++ {
-				mboxID := ts.nameplates[i]
-				if mboxID == "" {
-					mboxID = crypto.RandHex(20)
-
-					mbox := newMailbox()
-
-					ts.mailboxes[mboxID] = mbox
-					ts.nameplates[i] = mboxID
-					nameplate = i
-					break
-				}
-			}
-			ts.mu.Unlock()
-
-			if nameplate < 1 {
-				errMsg(m.ID, m, fmt.Errorf("failed to allocate nameplate"))
-				continue
-			}
-
-			resp := &msgs.AllocatedResp{
-				Nameplate: fmt.Sprintf("%d", nameplate),
-			}
-			sendMsg(resp)
-		case *msgs.Claim:
-			ackMsg(m.ID)
-
-			nameplate, err := strconv.Atoi(m.Nameplate)
+		var sendMu sync.Mutex
+		sendMsg := func(msg interface{}) {
+			prepareServerMsg(msg)
+			sendMu.Lock()
+			defer sendMu.Unlock()
+			err = c.WriteJSON(msg)
 			if err != nil {
-				panic(fmt.Sprintf("nameplate %s is not an int", m.Nameplate))
+				panic(err)
+			}
+		}
+
+		var requiredBits uint
+		var method string = "none"
+
+		if welcomeMsg.Welcome.PermissionRequired != nil {
+			if welcomeMsg.Welcome.PermissionRequired.HashCash != nil {
+				requiredBits = welcomeMsg.Welcome.PermissionRequired.HashCash.Bits
+				method = "hashcash"
+			}
+		}
+
+		sendMsg(welcomeMsg)
+
+		ackMsg := func(id string) {
+			ack := &msgs.Ack{
+				ID: id,
+			}
+			sendMsg(ack)
+		}
+
+		errMsg := func(id string, orig interface{}, reason error) {
+			errPacket := &msgs.Error{
+				Error: reason.Error(),
+				Orig:  orig,
 			}
 
-			ts.mu.Lock()
-			mboxID := ts.nameplates[int16(nameplate)]
-			ts.mu.Unlock()
-			if mboxID == "" {
-				errMsg(m.ID, m, fmt.Errorf("no namespaces available"))
-				continue
+			sendMsg(errPacket)
+		}
+
+		var sideID string
+		var openMailbox *mailbox
+
+		defer func() {
+			if sideID != "" && openMailbox != nil {
+				openMailbox.Lock()
+				delete(openMailbox.clients, sideID)
+				openMailbox.Unlock()
 			}
+		}()
 
-			ts.mu.Lock()
-			mbox := ts.mailboxes[mboxID]
-			ts.mu.Unlock()
-			if mbox == nil {
-				errMsg(m.ID, m, fmt.Errorf("no mailbox found associated to nameplate %s", m.Nameplate))
-				continue
-			}
-
-			var crowded bool
-			mbox.Lock()
-			if mbox.claimCount > 1 {
-				crowded = true
-			} else {
-				mbox.claimCount++
-			}
-			mbox.Unlock()
-
-			if crowded {
-				errMsg(m.ID, m, errors.New("crowded"))
-				continue
-			}
-
-			resp := &msgs.ClaimedResp{
-				Mailbox: mboxID,
-			}
-			sendMsg(resp)
-		case *msgs.Open:
-			ackMsg(m.ID)
-
-			if openMailbox != nil {
-				errMsg(m.ID, m, errors.New("only one open per connection"))
-				continue
-			}
-
-			ts.mu.Lock()
-			mbox := ts.mailboxes[m.Mailbox]
-			ts.mu.Unlock()
-
-			if mbox == nil {
-				errMsg(m.ID, m, errors.New("mailbox not found"))
-				continue
-			}
-
-			msgChan := make(chan mboxMsg)
-
-			mbox.Lock()
-			mbox.clients[sideID] = msgChan
-			pendingMsgs := make([]mboxMsg, len(mbox.msgs))
-			copy(pendingMsgs, mbox.msgs)
-			mbox.Unlock()
-
-			for _, mboxMsg := range pendingMsgs {
-				msg := &msgs.Message{
-					Side:  mboxMsg.side,
-					Phase: mboxMsg.phase,
-					Body:  mboxMsg.body,
+		permissionGranted := false
+		if welcomeMsg.Welcome.PermissionRequired != nil {
+			if welcomeMsg.Welcome.PermissionRequired.None != nil {
+				if *welcomeMsg.Welcome.PermissionRequired.None == struct{}{} {
+					permissionGranted = true
 				}
-				sendMsg(msg)
+			}
+		}
+		for {
+			_, msgBytes, err := c.ReadMessage()
+			if _, isCloseErr := err.(*websocket.CloseError); err == io.EOF || isCloseErr {
+				break
+			} else if err != nil {
+				panic(err)
 			}
 
-			go func() {
-				for mboxMsg := range msgChan {
+			msg, err := serverUnmarshal(msgBytes)
+			if err != nil {
+				panic(fmt.Sprintf("err: %s msg: %s", err, msgBytes))
+			}
+
+			switch m := msg.(type) {
+			case *msgs.SubmitPermissions:
+				ackMsg(m.ID)
+				// currently test server only supports
+				// hashcash in the "submit-permissions" msg.
+				switch method {
+				case "hashcash":
+					if m.Method != method {
+						// send an error message to the client
+						errMsg(m.ID, m, fmt.Errorf("unknown permission method %s", m.Method))
+					}
+					// if hashcash and if the hash doesn't match, send error too.
+					if m.Method == method {
+						// extract stamp and find its sha1
+						// find leading zeros in the calculated sha1
+						// check if that is greater than required number of zeros
+						// if not, send an error and close the connection
+						stamp := m.Stamp
+						resource := welcomeMsg.Welcome.PermissionRequired.HashCash.Resource
+						v, err := hashcash.Evaluate(stamp, requiredBits, resource, 0)
+						if v {
+							permissionGranted = true
+						} else {
+							// send an error to the client and close the connection
+							errMsg(m.ID, m, fmt.Errorf("Bad stamp, permission denied: %v", err))
+							continue
+						}
+					}
+				default:
+					errMsg(m.ID, m, fmt.Errorf("unsupported protocol: %v", method))
+					continue
+				}
+			case *msgs.Bind:
+				if sideID != "" {
+					ackMsg(m.ID)
+					errMsg(m.ID, m, fmt.Errorf("already bound"))
+					continue
+				}
+
+				if m.Side == "" {
+					ackMsg(m.ID)
+					errMsg(m.ID, m, fmt.Errorf("bind requires 'side'"))
+					continue
+				}
+				ts.mu.Lock()
+				ts.agents = append(ts.agents, m.ClientVersion)
+				ts.mu.Unlock()
+				sideID = m.Side
+
+				ackMsg(m.ID)
+				if !permissionGranted {
+					errMsg(m.ID, m, fmt.Errorf("must send submit-permission first"))
+					// server should actually close the
+					// connection if submit-permission is
+					// not sent before bind message.
+					continue
+				}
+			case *msgs.Allocate:
+				ackMsg(m.ID)
+
+				var nameplate int16
+				ts.mu.Lock()
+				for i := int16(1); i < math.MaxInt16; i++ {
+					mboxID := ts.nameplates[i]
+					if mboxID == "" {
+						mboxID = crypto.RandHex(20)
+
+						mbox := newMailbox()
+
+						ts.mailboxes[mboxID] = mbox
+						ts.nameplates[i] = mboxID
+						nameplate = i
+						break
+					}
+				}
+				ts.mu.Unlock()
+
+				if nameplate < 1 {
+					errMsg(m.ID, m, fmt.Errorf("failed to allocate nameplate"))
+					continue
+				}
+
+				resp := &msgs.AllocatedResp{
+					Nameplate: fmt.Sprintf("%d", nameplate),
+				}
+				sendMsg(resp)
+			case *msgs.Claim:
+				ackMsg(m.ID)
+
+				nameplate, err := strconv.Atoi(m.Nameplate)
+				if err != nil {
+					panic(fmt.Sprintf("nameplate %s is not an int", m.Nameplate))
+				}
+
+				ts.mu.Lock()
+				mboxID := ts.nameplates[int16(nameplate)]
+				ts.mu.Unlock()
+				if mboxID == "" {
+					errMsg(m.ID, m, fmt.Errorf("no namespaces available"))
+					continue
+				}
+
+				ts.mu.Lock()
+				mbox := ts.mailboxes[mboxID]
+				ts.mu.Unlock()
+				if mbox == nil {
+					errMsg(m.ID, m, fmt.Errorf("no mailbox found associated to nameplate %s", m.Nameplate))
+					continue
+				}
+
+				var crowded bool
+				mbox.Lock()
+				if mbox.claimCount > 1 {
+					crowded = true
+				} else {
+					mbox.claimCount++
+				}
+				mbox.Unlock()
+
+				if crowded {
+					errMsg(m.ID, m, errors.New("crowded"))
+					continue
+				}
+
+				resp := &msgs.ClaimedResp{
+					Mailbox: mboxID,
+				}
+				sendMsg(resp)
+			case *msgs.Open:
+				ackMsg(m.ID)
+
+				if openMailbox != nil {
+					errMsg(m.ID, m, errors.New("only one open per connection"))
+					continue
+				}
+
+				ts.mu.Lock()
+				mbox := ts.mailboxes[m.Mailbox]
+				ts.mu.Unlock()
+
+				if mbox == nil {
+					errMsg(m.ID, m, errors.New("mailbox not found"))
+					continue
+				}
+
+				msgChan := make(chan mboxMsg)
+
+				mbox.Lock()
+				mbox.clients[sideID] = msgChan
+				pendingMsgs := make([]mboxMsg, len(mbox.msgs))
+				copy(pendingMsgs, mbox.msgs)
+				mbox.Unlock()
+
+				for _, mboxMsg := range pendingMsgs {
 					msg := &msgs.Message{
 						Side:  mboxMsg.side,
 						Phase: mboxMsg.phase,
@@ -362,35 +481,46 @@ func (ts *TestServer) handleWS(w http.ResponseWriter, r *http.Request) {
 					}
 					sendMsg(msg)
 				}
-			}()
 
-			openMailbox = mbox
-		case *msgs.Release:
-			ackMsg(m.ID)
+				go func() {
+					for mboxMsg := range msgChan {
+						msg := &msgs.Message{
+							Side:  mboxMsg.side,
+							Phase: mboxMsg.phase,
+							Body:  mboxMsg.body,
+						}
+						sendMsg(msg)
+					}
+				}()
 
-			nameplate, err := strconv.Atoi(m.Nameplate)
-			if err != nil {
-				errMsg(m.ID, m, errors.New("no nameplate found"))
-				continue
+				openMailbox = mbox
+			case *msgs.Release:
+				ackMsg(m.ID)
+
+				nameplate, err := strconv.Atoi(m.Nameplate)
+				if err != nil {
+					errMsg(m.ID, m, errors.New("no nameplate found"))
+					continue
+				}
+
+				ts.mu.Lock()
+				delete(ts.nameplates, int16(nameplate))
+				ts.mu.Unlock()
+
+				sendMsg(&msgs.ReleasedResp{})
+			case *msgs.Add:
+				ackMsg(m.ID)
+
+				openMailbox.Add(sideID, m)
+
+			case *msgs.Close:
+				ackMsg(m.ID)
+
+				sendMsg(&msgs.ClosedResp{})
+
+			default:
+				log.Printf("Test server got unexpected message: %v", msg)
 			}
-
-			ts.mu.Lock()
-			delete(ts.nameplates, int16(nameplate))
-			ts.mu.Unlock()
-
-			sendMsg(&msgs.ReleasedResp{})
-		case *msgs.Add:
-			ackMsg(m.ID)
-
-			openMailbox.Add(sideID, m)
-
-		case *msgs.Close:
-			ackMsg(m.ID)
-
-			sendMsg(&msgs.ClosedResp{})
-
-		default:
-			log.Printf("Test server got unexpected message: %v", msg)
 		}
 	}
 }
