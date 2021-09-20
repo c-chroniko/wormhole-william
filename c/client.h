@@ -8,4 +8,4 @@ typedef struct client_config {
 } client_config;
 
 typedef void (*callback)(void *ctx, void* value, int32_t err_code);
-void call_callback (callback cb, void *value, int32_t err_code);
+void call_callback (void *ctx, callback cb, void *value, int32_t err_code);
