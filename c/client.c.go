@@ -134,6 +134,7 @@ func ClientSendFile(ctxC *C.void, clientPtr uintptr, fileName *C.char, length C.
 
 //export ClientRecvText
 func ClientRecvText(ctxC *C.void, clientPtr uintptr, codeC *C.char, cb C.callback) int {
+	fmt.Printf("in ClientRecvText\n")
 	client, err := getClient(clientPtr)
 	if err != nil {
 		return int(codes.ERR_NO_CLIENT)
@@ -142,17 +143,26 @@ func ClientRecvText(ctxC *C.void, clientPtr uintptr, codeC *C.char, cb C.callbac
 	_ctxC := unsafe.Pointer(ctxC)
 
 	go func() {
+		fmt.Printf("receiving...\n")
 		msg, err := client.Receive(ctx, C.GoString(codeC))
 		if err != nil {
+			fmt.Printf("error while receiving\n")
 			C.call_callback(_ctxC, cb, nil, C.int(codes.ERR_RECV_TEXT))
 		}
+		fmt.Printf("received\n")
 
+		// TODO: something more memory effecient.
 		data, err := ioutil.ReadAll(msg)
 		if err != nil {
 			C.call_callback(_ctxC, cb, nil, C.int(codes.ERR_RECV_TEXT_DATA))
 		}
-
-		C.call_callback(_ctxC, cb, unsafe.Pointer(C.CString(string(data))), C.int(codes.OK))
+		fmt.Printf("received msg data: %s\n", data)
+		dataC := C.CBytes(data)
+		fileC := C.file_t{
+			length: C.int(len(data)),
+			data: (*C.uint8_t)(dataC),
+		}
+		C.call_callback(_ctxC, cb, unsafe.Pointer(&fileC), C.int(codes.OK))
 	}()
 
 	return int(codes.OK)
