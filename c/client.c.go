@@ -158,11 +158,12 @@ func ClientRecvText(ctxC *C.void, clientPtr uintptr, codeC *C.char, cb C.callbac
 		}
 		fmt.Printf("received msg data: %s\n", data)
 		dataC := C.CBytes(data)
-		fileC := C.file_t{
+		fileC := (*C.file_t)(C.malloc(C.sizeof_file_t))
+		*fileC = C.file_t{
 			length: C.int(len(data)),
 			data: (*C.uint8_t)(dataC),
 		}
-		C.call_callback(_ctxC, cb, unsafe.Pointer(&fileC), C.int(codes.OK))
+		C.call_callback(_ctxC, cb, unsafe.Pointer(fileC), C.int(codes.OK))
 	}()
 
 	return int(codes.OK)
