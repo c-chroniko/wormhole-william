@@ -7,8 +7,11 @@ typedef struct client_config {
     int32_t passphrase_length;
 } client_config;
 
-typedef void (*callback)(void *ctx, void* value, int32_t err_code);
-void call_callback (void *ctx, callback cb, void *value, int32_t err_code);
+typedef int32_t (*callback)(void *ctx, void* value, int32_t err_code);
+int32_t call_callback (void *ctx, callback cb, void *value, int32_t err_code);
+
+typedef void (*init_fn)(void *data);
+void call_init (init_fn init, void *data);
 
 typedef struct {
   int32_t length;

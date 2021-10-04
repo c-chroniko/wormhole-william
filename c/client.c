@@ -1,5 +1,9 @@
 #include "client.h"
 
-void call_callback(void *ctx, callback cb, void *result, int32_t err_code) {
-    cb(ctx, result, err_code);
+int32_t call_callback(void *ctx, callback cb, void *result, int32_t err_code) {
+    return cb(ctx, result, err_code);
+};
+
+void call_init(init_fn init, void *data) {
+    init(data);
 };

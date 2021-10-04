@@ -86,6 +86,7 @@ func ClientSendText(ctxC *C.void, clientPtr uintptr, msgC *C.char, codeOutC **C.
 	*codeOutC = C.CString(code)
 
 	go func() {
+	    C.call_init(InitFunc, unsafe.Pointer(InitData));
 		s := <-status
 		if s.Error != nil {
 			// TODO: stick error message somewhere conventional for C to read.
@@ -118,6 +119,7 @@ func ClientSendFile(ctxC *C.void, clientPtr uintptr, fileName *C.char, length C.
 	*codeOutC = C.CString(code)
 
 	go func() {
+	    C.call_init(InitFunc, unsafe.Pointer(InitData));
 		s := <-status
 		if s.Error != nil {
 			// TODO: stick error message somewhere conventional for C to read.
@@ -143,6 +145,7 @@ func ClientRecvText(ctxC *C.void, clientPtr uintptr, codeC *C.char, cb C.callbac
 	_ctxC := unsafe.Pointer(ctxC)
 
 	go func() {
+	    C.call_init(InitFunc, unsafe.Pointer(InitData));
 		fmt.Printf("receiving...\n")
 		msg, err := client.Receive(ctx, C.GoString(codeC))
 		if err != nil {
@@ -163,10 +166,19 @@ func ClientRecvText(ctxC *C.void, clientPtr uintptr, codeC *C.char, cb C.callbac
 			length: C.int(len(data)),
 			data: (*C.uint8_t)(dataC),
 		}
-		C.call_callback(_ctxC, cb, unsafe.Pointer(fileC), C.int(codes.OK))
+		dartSendStatus := C.call_callback(_ctxC, cb, unsafe.Pointer(fileC), C.int(codes.OK))
+		fmt.Printf("dartSendStatus: %s\n", dartSendStatus)
 	}()
 
 	return int(codes.OK)
+}
+
+var InitFunc C.init_fn
+var InitData *C.void
+//export client_RegisterInit
+func client_RegisterInit(initFunc C.init_fn, data *C.void) {
+    InitFunc = initFunc
+    InitData = data
 }
 
 // TODO: refactor w/ wasm package?
