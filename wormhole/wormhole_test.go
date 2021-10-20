@@ -527,7 +527,7 @@ func TestWormholeFileTransportSendMidStreamCancel(t *testing.T) {
 func TestPendingSendCancelable(t *testing.T) {
 	ctx := context.Background()
 
-	rs := rendezvousservertest.NewServer()
+	rs := rendezvousservertest.NewServerLegacy()
 	defer rs.Close()
 
 	url := rs.WebSocketURL()
@@ -535,12 +535,12 @@ func TestPendingSendCancelable(t *testing.T) {
 	testDisableLocalListener = true
 	defer func() { testDisableLocalListener = false }()
 
-	relayServer := newTestRelayServer()
+	relayServer := newTestTCPRelayServer()
 	defer relayServer.close()
 
 	c0 := Client{
 		RendezvousURL:       url,
-		TransitRelayAddress: relayServer.addr,
+		TransitRelayURL: relayServer.addr,
 	}
 
 	fileContent := make([]byte, 1<<16)
@@ -603,7 +603,7 @@ func TestPendingSendCancelable(t *testing.T) {
 func TestPendingRecvCancelable(t *testing.T) {
 	ctx := context.Background()
 
-	rs := rendezvousservertest.NewServer()
+	rs := rendezvousservertest.NewServerLegacy()
 	defer rs.Close()
 
 	url := rs.WebSocketURL()
@@ -611,12 +611,12 @@ func TestPendingRecvCancelable(t *testing.T) {
 	testDisableLocalListener = true
 	defer func() { testDisableLocalListener = false }()
 
-	relayServer := newTestRelayServer()
+	relayServer := newTestTCPRelayServer()
 	defer relayServer.close()
 
 	c0 := Client{
 		RendezvousURL:       url,
-		TransitRelayAddress: relayServer.addr,
+		TransitRelayURL: relayServer.addr,
 	}
 
 	childCtx, cancel := context.WithCancel(ctx)
