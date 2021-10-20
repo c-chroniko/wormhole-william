@@ -428,16 +428,9 @@ func (ts *TestServer) withWelcome(welcomeMsg *msgs.Welcome) func(http.ResponseWr
 				ts.mu.Unlock()
 
 				ts.mu.Lock()
-				mboxID := ts.nameplates[int16(nameplate)]
-				ts.mu.Unlock()
-				if mboxID == "" {
-					errMsg(m.ID, m, fmt.Errorf("no namespaces available"))
-					continue
-				}
-
-				ts.mu.Lock()
 				mbox := ts.mailboxes[mboxID]
 				ts.mu.Unlock()
+
 				if mbox == nil {
 					errMsg(m.ID, m, fmt.Errorf("no mailbox found associated to nameplate %s", m.Nameplate))
 					continue
