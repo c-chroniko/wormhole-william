@@ -440,10 +440,10 @@ func TestWormholeFileTransportRecvMidStreamCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	receiver, err := c1.Receive(ctx, code)
+	receiver, err := c1.Receive(childCtx, code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -550,10 +550,10 @@ func TestPendingSendCancelable(t *testing.T) {
 
 	buf := bytes.NewReader(fileContent)
 
-	ctx, cancel := context.WithCancel(ctx)
+	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	code, resultCh, err := c0.SendFile(ctx, "file.txt", buf)
+	code, resultCh, err := c0.SendFile(childCtx, "file.txt", buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,8 +588,8 @@ func TestPendingSendCancelable(t *testing.T) {
 	cancel()
 
 	select {
-	// case <-childCtx.Done():
-	// 	fmt.Printf("got a cancel\n")
+	case <-childCtx.Done():
+		fmt.Printf("got a cancel\n")
 	case result := <-resultCh:
 		if result.OK {
 			t.Fatalf("Expected cancellation error but got OK")
@@ -621,13 +621,13 @@ func TestPendingRecvCancelable(t *testing.T) {
 		TransitRelayURL: relayServer.addr,
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	code := "87-firetrap-fallacy"
 	resultCh := make(chan error, 1)
 	go func() {
-		_, err := c0.Receive(ctx, code)
+		_, err := c0.Receive(childCtx, code)
 		resultCh <- err
 	}()
 
@@ -680,8 +680,8 @@ func TestPendingRecvCancelable(t *testing.T) {
 		if gotErr == nil {
 			t.Fatalf("Expected an error but got none")
 		}
-	// case <-childCtx.Done():
-	// 	fmt.Printf("got a cancel\n")
+	case <-childCtx.Done():
+		fmt.Printf("got a cancel\n")
 	case <-time.After(5 * time.Second):
 		t.Fatalf("Timeout waiting for recv cancel")
 	}
