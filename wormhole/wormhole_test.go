@@ -638,20 +638,20 @@ func TestPendingRecvCancelable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer rc.Close(ctx, rendezvous.Happy)
-
 	for i := 0; i < 20; i++ {
 		nameplates, err := rc.ListNameplates(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(nameplates) > 0 {
+			fmt.Printf("nameplates: %v\n", nameplates)
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
 
 	defer rc.Close(ctx, rendezvous.Happy)
+
 	nameplate, err := nameplateFromCode(code)
 	if err != nil {
 		t.Fatal(err)
@@ -674,9 +674,12 @@ func TestPendingRecvCancelable(t *testing.T) {
 
 	select {
 	case gotErr := <-resultCh:
+		fmt.Printf("Got something on the resultChannel: %v\n", gotErr)
 		if gotErr == nil {
 			t.Fatalf("Expected an error but got none")
 		}
+	case <-ctx.Done():
+		fmt.Printf("got a cancel\n")
 	case <-time.After(5 * time.Second):
 		t.Fatalf("Timeout waiting for recv cancel")
 	}
