@@ -680,7 +680,7 @@ func TestPendingRecvCancelable(t *testing.T) {
 		if gotErr == nil {
 			t.Fatalf("Expected an error but got none")
 		}
-	case <-ctx.Done():
+	case <-childCtx.Done():
 		fmt.Printf("got a cancel\n")
 	case <-time.After(5 * time.Second):
 		t.Fatalf("Timeout waiting for recv cancel")
