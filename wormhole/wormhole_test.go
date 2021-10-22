@@ -539,7 +539,7 @@ func TestPendingSendCancelable(t *testing.T) {
 	defer relayServer.close()
 
 	c0 := Client{
-		RendezvousURL:       url,
+		RendezvousURL:   url,
 		TransitRelayURL: relayServer.addr,
 	}
 
@@ -615,7 +615,7 @@ func TestPendingRecvCancelable(t *testing.T) {
 	defer relayServer.close()
 
 	c0 := Client{
-		RendezvousURL:       url,
+		RendezvousURL:   url,
 		TransitRelayURL: relayServer.addr,
 	}
 
