@@ -288,7 +288,6 @@ func (ts *TestServer) withWelcome(welcomeMsg *msgs.Welcome) func(http.ResponseWr
 			sendMsg(errPacket)
 		}
 
-
 		var sideID string
 		var openMailbox *mailbox
 
