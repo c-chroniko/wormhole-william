@@ -588,7 +588,7 @@ func TestPendingSendCancelable(t *testing.T) {
 	cancel()
 
 	select {
-	case <-ctx.Done():
+	case <-childCtx.Done():
 		fmt.Printf("got a cancel\n")
 	case result := <-resultCh:
 		if result.OK {
