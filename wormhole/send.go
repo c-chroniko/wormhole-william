@@ -196,6 +196,7 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *OfferMsg, r io.Re
 	sideID := crypto.RandSideID()
 	appID := c.appID()
 	rc := rendezvous.NewClient(c.url(), sideID, appID)
+	// defer rc.Close(ctx, rendezvous.Happy)
 
 	_, err := rc.Connect(ctx)
 	if err != nil {
@@ -349,6 +350,7 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *OfferMsg, r io.Re
 		}
 
 		conn, err := transport.acceptConnection(ctx)
+		defer conn.Close()
 		if err != nil {
 			sendErr(err)
 			return
