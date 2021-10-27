@@ -245,6 +245,7 @@ func Client_RecvFile(_ js.Value, args []js.Value) interface{} {
 
 		readerObj := NewFileStreamReader(ctx, msg)
 		readerObj.Set("cancel", js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+			fmt.Printf("[debug] closing context: %p\n", ctx)
 			cancel()
 			return nil
 		}))
@@ -256,25 +257,42 @@ func NewFileStreamReader(ctx context.Context, msg *wormhole.IncomingMessage) js.
 	// TODO: parameterize
 	bufSize := 1024 * 4 // 4KiB
 
+	fmt.Printf("[debug] read called with context: %p\n", ctx)
 	total := 0
 	readFunc := func(_ js.Value, args []js.Value) interface{} {
 		buf := make([]byte, bufSize)
 		return NewPromise(func(resolve ResolveFn, reject RejectFn) {
+			fmt.Println("[debug] read called")
+
 			// TODO: improve
-			go func() {
-				<-ctx.Done()
+			select {
+			case <-ctx.Done():
 				if err := ctx.Err(); err != nil {
 					reject(err)
+					return
 				}
-			}()
+			default:
+			}
 
 			if len(args) != 1 {
 				reject(fmt.Errorf("invalid number of arguments: %d. expected: %d", len(args), 1))
+				return
 			}
 
 			jsBuf := args[0]
 			_resolve := func(n int, done bool) {
 				js.CopyBytesToJS(jsBuf, buf[:n])
+
+				select {
+				case <-ctx.Done():
+					if err := ctx.Err(); err != nil {
+						reject(err)
+						return
+					}
+				default:
+					fmt.Printf("[debug] context hasn't been cancelled: %p\n", ctx)
+				}
+
 				resolve(js.Global().Get("Array").New(n, done))
 			}
 			n, err := msg.Read(buf)
