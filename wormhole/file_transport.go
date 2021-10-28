@@ -19,6 +19,7 @@ import (
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/nacl/secretbox"
+	"nhooyr.io/websocket"
 )
 
 type fileTransportAck struct {
@@ -33,6 +34,10 @@ const (
 	TransferDirectory
 	TransferText
 )
+
+// UnsupportedProtocolErr is used in the default case of protocol switch
+// statements to account for unexpected protocols.
+var UnsupportedProtocolErr = errors.New("unsupported protocol")
 
 func (tt TransferType) String() string {
 	switch tt {
@@ -253,11 +258,28 @@ func (t *fileTransport) connectDirect(otherTransit *transitMsg) (net.Conn, error
 
 func (t *fileTransport) connectToRelay(ctx context.Context, successChan chan net.Conn, failChan chan string) {
 	var d net.Dialer
+	var conn net.Conn
+	var err error
 	addr := t.relayURL.Addr()
-	conn, err := d.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		failChan <- addr
-		return
+
+	switch t.relayURL.Proto {
+	case "tcp":
+		conn, err = d.DialContext(ctx, "tcp", addr)
+
+		if err != nil {
+			failChan <- addr
+			return
+		}
+	case "ws", "wss":
+		var wsconn *websocket.Conn
+		wsconn, _, err = websocket.Dial(ctx, t.relayURL.String(), nil)
+
+		if err != nil {
+			failChan <- addr
+			return
+		}
+
+		conn = websocket.NetConn(ctx, wsconn, websocket.MessageBinary)
 	}
 
 	_, err = conn.Write(t.relayHandshakeHeader())
@@ -375,12 +397,23 @@ func (t *fileTransport) makeTransitMsg() (*transitMsg, error) {
 	}
 
 	if t.relayConn != nil {
+		// TODO: use an enum
+		var relayType string
+		switch t.relayURL.Proto {
+		case "tcp":
+			relayType = "direct-tcp-v1"
+		case "ws":
+			relayType = "direct-ws-v1"
+		case "wss":
+			relayType = "direct-wss-v1"
+		default:
+			return nil, fmt.Errorf("unknown relay protocol")
 		}
 		msg.HintsV1 = append(msg.HintsV1, transitHintsV1{
 			Type: "relay-v1",
 			Hints: []transitHintsV1Hint{
 				{
-					Type:     "direct-tcp-v1",
+					Type:     relayType,
 					Priority: 2.0,
 					Hostname: t.relayURL.Host,
 					Port:     t.relayURL.Port,
@@ -443,23 +476,57 @@ func (t *fileTransport) listen() error {
 	if testDisableLocalListener {
 		return nil
 	}
+	switch t.relayURL.Proto {
+	case "tcp":
+		l, err := net.Listen("tcp", ":0")
+		if err != nil {
+			return err
+		}
 
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return err
+		t.listener = l
+	case "ws", "wss":
+		t.listener = nil
+	default:
+		return fmt.Errorf("%w: %s", UnsupportedProtocolErr, t.relayURL.Proto)
 	}
 
-	t.listener = l
 	return nil
 }
 
-func (t *fileTransport) listenRelay() error {
-    addr := t.relayURL.Addr()
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		return err
+func (t *fileTransport) listenRelay() (err error) {
+
+	ctx := context.Background()
+
+	var conn net.Conn
+	switch t.relayURL.Proto {
+	case "tcp":
+		// NB: don't dial the relay if we don't have an address.
+		addr := t.relayURL.Addr()
+		if addr == ":0" {
+			return nil
+		}
+		conn, err = net.Dial("tcp", addr)
+		if err != nil {
+			return err
+		}
+	case "ws", "wss":
+		c, _, err := websocket.Dial(ctx, t.relayURL.String(), nil)
+		if err != nil {
+			return fmt.Errorf("websocket.Dial failed")
+		}
+		conn = websocket.NetConn(ctx, c, websocket.MessageBinary)
+	default:
+		return fmt.Errorf("%w: %s", UnsupportedProtocolErr, t.relayURL.Proto)
 	}
 
+	// TODO: obsolete
+	defer func() {
+		if err := recover(); err != nil {
+			err = errors.New("unable to connect to the relay server")
+		}
+	}()
+	// TODO: fix
+	// NB: panics if websocket server is not listening.
 	_, err = conn.Write(t.relayHandshakeHeader())
 	if err != nil {
 		conn.Close()
