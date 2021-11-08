@@ -118,6 +118,14 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 			return
 		}
 
+		go func() {
+			<-ctx.Done()
+			fmt.Printf("client.SendFile: received cancel signal\n")
+			if err := ctx.Err(); err != nil {
+				reject(err)
+			}
+		}()
+
 		clientPtr := uintptr(args[0].Int())
 		fileName := args[1].String()
 
@@ -147,7 +155,10 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 		returnObj := js.Global().Get("Object").New()
 		returnObj.Set("code", code)
 		returnObj.Set("cancel", js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
+			fmt.Printf("cancelling...")
 			cancel()
+			fmt.Printf("cancelled\n")
+			//return js.Global().Get("undefined")
 			return nil
 		}))
 		returnObj.Set("done", NewPromise(
@@ -156,19 +167,25 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 				case result := <-resultChan:
 					switch {
 					case result.Error != nil:
+						fmt.Printf("resultChan: error %v\n", result.Error)
 						reject(result.Error)
 					case result.OK == true:
+						fmt.Printf("resultChan: result OK")
 						resolve(nil)
 					default:
 						reject(errors.New("unknown send result"))
 					}
-				case <-ctx.Done():
-					if err := ctx.Err(); err == nil {
-						resolve(nil)
-					} else {
-						reject(err)
-					}
+				// case <-ctx.Done():
+				// 	fmt.Printf("context cancelled...\n")
+				// 	if err := ctx.Err(); err == nil {
+				// 		fmt.Printf("context cancelled, resolve\n")
+				// 		resolve(nil)
+				// 	} else {
+				// 		fmt.Printf("context cancelled, reject\n")
+				// 		reject(err)
+				// 	}
 				}
+				resolve(nil)
 			}),
 		)
 		resolve(returnObj)
@@ -261,12 +278,12 @@ func NewFileStreamReader(ctx context.Context, msg *wormhole.IncomingMessage) js.
 		buf := make([]byte, bufSize)
 		return NewPromise(func(resolve ResolveFn, reject RejectFn) {
 			// TODO: improve
-			go func() {
-				<-ctx.Done()
-				if err := ctx.Err(); err != nil {
-					reject(err)
-				}
-			}()
+			//go func() {
+			//	<-ctx.Done()
+			//	if err := ctx.Err(); err != nil {
+			//		reject(err)
+			//	}
+			//}()
 
 			if len(args) != 1 {
 				reject(fmt.Errorf("invalid number of arguments: %d. expected: %d", len(args), 1))

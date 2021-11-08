@@ -109,7 +109,6 @@ func (c *Client) Receive(ctx context.Context, code string, opts ...TransferOptio
 		answer := &genericMessage{
 			Error: &errStr,
 		}
-		ctx := context.Background()
 
 		err = clientProto.WriteAppData(ctx, answer)
 		if err != nil {
@@ -208,7 +207,6 @@ func (c *Client) Receive(ctx context.Context, code string, opts ...TransferOptio
 				FileAck: "ok",
 			},
 		}
-		ctx := context.Background()
 
 		err := clientProto.WriteAppData(ctx, answer)
 		if err != nil {
