@@ -376,7 +376,13 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *OfferMsg, r io.Re
 		defer cancel()
 
 		go func() {
+			fmt.Printf("calling cancel.....\n")
 			<-ctx.Done()
+			fmt.Printf("cancelled...\n")
+			ch <- SendResult{
+				Error: errors.New("context canceled"),
+			}
+			close(ch)
 			conn.Close()
 		}()
 
@@ -391,6 +397,7 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *OfferMsg, r io.Re
 				}
 				progress += int64(n)
 				if options.progressFunc != nil {
+					fmt.Printf("progress fn being called.. \n")
 					options.progressFunc(progress, totalSize)
 				}
 			}
@@ -499,6 +506,11 @@ func (c *Client) SendDirectory(ctx context.Context, directoryName string, entrie
 		r := <-resultCh
 		zipInfo.file.Close()
 		retCh <- r
+	}()
+
+	go func() {
+		<-ctx.Done()
+		retCh <- SendResult{Error: errors.New("canceled")}
 	}()
 
 	return code, retCh, err
