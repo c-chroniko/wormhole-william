@@ -265,12 +265,12 @@ func NewFileStreamReader(ctx context.Context, msg *wormhole.IncomingMessage) js.
 		buf := make([]byte, bufSize)
 		return NewPromise(func(resolve ResolveFn, reject RejectFn) {
 			// TODO: improve
-			//go func() {
-			//	<-ctx.Done()
-			//	if err := ctx.Err(); err != nil {
-			//		reject(err)
-			//	}
-			//}()
+			go func() {
+				<-ctx.Done()
+				if err := ctx.Err(); err != nil {
+					reject(err)
+				}
+			}()
 
 			if len(args) != 1 {
 				reject(fmt.Errorf("invalid number of arguments: %d. expected: %d", len(args), 1))
