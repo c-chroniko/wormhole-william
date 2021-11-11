@@ -155,9 +155,7 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 		returnObj := js.Global().Get("Object").New()
 		returnObj.Set("code", code)
 		returnObj.Set("cancel", js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
-			fmt.Printf("canceling...")
 			cancel()
-			fmt.Printf("cancelled\n")
 			//return js.Global().Get("undefined")
 			return nil
 		}))
@@ -165,13 +163,10 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 			func(resolve ResolveFn, reject RejectFn) {
 				select {
 				case result := <-resultChan:
-					fmt.Printf("result: %v\n", result)
 					switch {
 					case result.Error != nil:
-						fmt.Printf("resultChan: error %v\n", result.Error)
 						reject(result.Error)
 					case result.OK == true:
-						fmt.Printf("resultChan: result OK")
 						resolve(nil)
 					default:
 						reject(errors.New("unknown send result"))
