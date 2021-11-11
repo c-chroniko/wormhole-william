@@ -371,19 +371,17 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *OfferMsg, r io.Re
 			totalSize = offer.Directory.ZipSize
 		}
 
-		var cancel func()
-		ctx, cancel = context.WithCancel(ctx)
-		defer cancel()
+		// var cancel func()
+		// ctx, cancel = context.WithCancel(ctx)
+		// defer cancel()
 
 		go func() {
-			fmt.Printf("calling cancel.....\n")
 			<-ctx.Done()
-			fmt.Printf("cancelled...\n")
 			ch <- SendResult{
 				Error: errors.New("context canceled"),
 			}
-			//close(ch)
-			//conn.Close()
+			// close(ch)
+			conn.Close()
 		}()
 
 		for {
@@ -436,7 +434,7 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *OfferMsg, r io.Re
 		ch <- SendResult{
 			OK: true,
 		}
-		close(ch)
+		// close(ch)
 	}()
 
 	return pwStr, ch, nil
