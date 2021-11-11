@@ -626,6 +626,7 @@ func TestPendingRecvCancelable(t *testing.T) {
 	resultCh := make(chan error, 1)
 	go func() {
 		_, err := c0.Receive(childCtx, code)
+		fmt.Printf("Receive failed with error: %v\n", err)
 		resultCh <- err
 	}()
 
