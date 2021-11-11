@@ -245,6 +245,14 @@ func (c *Client) Receive(ctx context.Context, code string, opts ...TransferOptio
 			return errors.New("failed to establish connection")
 		}
 
+		go func() {
+			<-ctx.Done()
+			fmt.Printf("receive: received cancel signal\n")
+			if err := ctx.Err(); err != nil {
+				conn.Close()
+			}
+		}()
+
 		cryptor := newTransportCryptor(conn, transitKey, "transit_record_sender_key", "transit_record_receiver_key")
 
 		fr.cryptor = cryptor
