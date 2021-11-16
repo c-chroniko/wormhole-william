@@ -31,6 +31,8 @@ type TestServer struct {
 
 var TestMotd = "ordure-posts"
 
+// this creates a rendezvous server that does not talk any
+// permission messages (as in the pre-permissions mailbox server).
 func NewServerLegacy() *TestServer {
 	ts := &TestServer{
 		mailboxes:  make(map[string]*mailbox),
