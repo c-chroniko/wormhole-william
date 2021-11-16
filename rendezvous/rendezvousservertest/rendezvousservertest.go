@@ -17,8 +17,7 @@ import (
 
 	"github.com/psanford/wormhole-william/internal/crypto"
 	"github.com/psanford/wormhole-william/rendezvous/internal/msgs"
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
+	"github.com/gorilla/websocket"
 	"github.com/LeastAuthority/hashcash"
 )
 
@@ -180,6 +179,11 @@ type mboxMsg struct {
 	side  string
 	phase string
 	body  string
+}
+
+var wsUpgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
 }
 
 func prepareServerMsg(msg interface{}) {
