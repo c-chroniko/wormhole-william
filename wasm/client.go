@@ -3,6 +3,7 @@
 package wasm
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -205,15 +206,22 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 			return
 		}
 
+		go func() {
+			<-ctx.Done()
+			fmt.Printf("client.SendFile: received cancel signal\n")
+			if err := ctx.Err(); err != nil {
+				reject(err)
+			}
+		}()
+
 		clientPtr := uintptr(args[0].Int())
 		fileName := args[1].String()
 
-		fileJSVal := args[2]
-		fileWrapper, err := NewFileWrapper(fileJSVal)
-		if err != nil {
-			reject(err)
-			return
-		}
+		uint8Array := args[2]
+		size := uint8Array.Get("byteLength").Int()
+		fileData := make([]byte, size)
+		js.CopyBytesToGo(fileData, uint8Array)
+		fileReader := bytes.NewReader(fileData)
 
 		err, client := getClient(clientPtr)
 		if err != nil {
@@ -226,7 +234,7 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 			opts = collectTransferOptions(args[3])
 		}
 
-		code, resultChan, err := client.SendFile(ctx, fileName, fileWrapper, true, opts...)
+		code, resultChan, err := client.SendFile(ctx, fileName, fileReader, true, opts...)
 		if err != nil {
 			reject(err)
 			return
@@ -236,6 +244,7 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 		returnObj.Set("code", code)
 		returnObj.Set("cancel", js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
 			cancel()
+			//return js.Global().Get("undefined")
 			return nil
 		}))
 		returnObj.Set("done", NewPromise(
@@ -250,13 +259,8 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 					default:
 						reject(errors.New("unknown send result"))
 					}
-				case <-ctx.Done():
-					if err := ctx.Err(); err == nil {
-						resolve(nil)
-					} else {
-						reject(err)
-					}
 				}
+				resolve(nil)
 			}),
 		)
 		resolve(returnObj)
@@ -342,7 +346,7 @@ func Client_RecvFile(_ js.Value, args []js.Value) interface{} {
 
 func NewFileStreamReader(ctx context.Context, msg *wormhole.IncomingMessage) js.Value {
 	// TODO: parameterize
-	bufSize := 1 << 14 // 1024 * 4 // 4KiB
+	bufSize := 1024 * 4 // 4KiB
 
 	total := 0
 	readFunc := func(_ js.Value, args []js.Value) interface{} {
@@ -378,9 +382,7 @@ func NewFileStreamReader(ctx context.Context, msg *wormhole.IncomingMessage) js.
 			_resolve(n, false)
 		})
 	}
-	//TODO: refactor JS dependency injection
-	// NB: this requires that streamsaver is available at `window.StreamSaver`
-	readerObj := js.Global().Get("Object").New() //bufSize, js.FuncOf(readFunc))
+	readerObj := js.Global().Get("Object").New()
 	readerObj.Set("bufferSizeBytes", bufSize)
 	readerObj.Set("read", js.FuncOf(readFunc))
 	readerObj.Set("name", msg.Name)
