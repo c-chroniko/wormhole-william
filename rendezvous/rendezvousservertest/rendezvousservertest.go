@@ -110,7 +110,7 @@ func NewServerWithPermHashcash() *TestServer {
 			MOTD: TestMotd,
 			PermissionRequired: &msgs.PermissionRequiredInfo{
 				HashCash: &msgs.HashCashInfo{
-					Bits:     20,
+					Bits:     10,
 					Resource: "foobarbaz",
 				},
 			},
