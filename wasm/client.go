@@ -208,7 +208,6 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 
 		go func() {
 			<-ctx.Done()
-			fmt.Printf("client.SendFile: received cancel signal\n")
 			if err := ctx.Err(); err != nil {
 				reject(err)
 			}
@@ -244,7 +243,6 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 		returnObj.Set("code", code)
 		returnObj.Set("cancel", js.FuncOf(func(_ js.Value, args []js.Value) interface{} {
 			cancel()
-			//return js.Global().Get("undefined")
 			return nil
 		}))
 		returnObj.Set("done", NewPromise(
