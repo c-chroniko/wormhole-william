@@ -3,7 +3,6 @@
 package wasm
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -216,11 +215,12 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 		clientPtr := uintptr(args[0].Int())
 		fileName := args[1].String()
 
-		uint8Array := args[2]
-		size := uint8Array.Get("byteLength").Int()
-		fileData := make([]byte, size)
-		js.CopyBytesToGo(fileData, uint8Array)
-		fileReader := bytes.NewReader(fileData)
+		fileJSVal := args[2]
+		fileWrapper, err := NewFileWrapper(fileJSVal)
+		if err != nil {
+			reject(err)
+			return
+		}
 
 		err, client := getClient(clientPtr)
 		if err != nil {
@@ -233,7 +233,7 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 			opts = collectTransferOptions(args[3])
 		}
 
-		code, resultChan, err := client.SendFile(ctx, fileName, fileReader, true, opts...)
+		code, resultChan, err := client.SendFile(ctx, fileName, fileWrapper, true, opts...)
 		if err != nil {
 			reject(err)
 			return
