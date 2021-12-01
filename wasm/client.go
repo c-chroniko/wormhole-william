@@ -149,6 +149,7 @@ func (fileWrapper *FileWrapper) Read(p []byte) (n int, err error) {
 		uint8Buf := uint8Array.New(arrayBuf)
 
 		n = js.CopyBytesToGo(p, uint8Buf)
+
 		bCh <- struct{}{}
 		return nil
 	})
@@ -344,7 +345,7 @@ func Client_RecvFile(_ js.Value, args []js.Value) interface{} {
 
 func NewFileStreamReader(ctx context.Context, msg *wormhole.IncomingMessage) js.Value {
 	// TODO: parameterize
-	bufSize := 1024 * 4 // 4KiB
+	bufSize := 16368 //1024 * 4 // 4KiB
 
 	total := 0
 	readFunc := func(_ js.Value, args []js.Value) interface{} {
