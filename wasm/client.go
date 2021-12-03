@@ -135,7 +135,7 @@ func (fileWrapper *FileWrapper) Read(p []byte) (n int, err error) {
 	start := fileWrapper.index
 	end := start + int64(len(p))
 
-	if start + int64(len(p)) > fileWrapper.Size {
+	if start+int64(len(p)) > fileWrapper.Size {
 		end = fileWrapper.Size
 	}
 
@@ -349,7 +349,7 @@ func Client_RecvFile(_ js.Value, args []js.Value) interface{} {
 
 func NewFileStreamReader(ctx context.Context, msg *wormhole.IncomingMessage) js.Value {
 	// TODO: parameterize
-	bufSize := 20*1024 // 16368 //1024 * 4 // 4KiB
+	bufSize := 20 * 1024 // 16368 //1024 * 4 // 4KiB
 
 	total := 0
 	readFunc := func(_ js.Value, args []js.Value) interface{} {
