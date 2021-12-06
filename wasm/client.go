@@ -349,7 +349,7 @@ func Client_RecvFile(_ js.Value, args []js.Value) interface{} {
 
 func NewFileStreamReader(ctx context.Context, msg *wormhole.IncomingMessage) js.Value {
 	// TODO: parameterize
-	bufSize := 20 * 1024 // 16368 //1024 * 4 // 4KiB
+	bufSize := 1024 * 4 // 4KiB
 
 	total := 0
 	readFunc := func(_ js.Value, args []js.Value) interface{} {
