@@ -135,7 +135,7 @@ func (fileWrapper *FileWrapper) Read(p []byte) (n int, err error) {
 	start := fileWrapper.index
 	end := start + int64(len(p))
 
-	if start+int64(len(p)) > fileWrapper.Size {
+	if end > fileWrapper.Size {
 		end = fileWrapper.Size
 	}
 
