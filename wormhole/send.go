@@ -428,7 +428,6 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *offerMsg, r io.Re
 		ch <- SendResult{
 			OK: true,
 		}
-		close(ch)
 	}()
 
 	return pwStr, ch, nil
