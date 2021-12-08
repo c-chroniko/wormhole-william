@@ -373,9 +373,9 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *offerMsg, r io.Re
 
 		go func() {
 			<-ctx.Done()
-			ch <- SendResult {
+			ch <- SendResult{
 				Error: errors.New("context canceled"),
-				}
+			}
 			conn.Close()
 		}()
 
