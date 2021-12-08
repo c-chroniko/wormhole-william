@@ -186,7 +186,6 @@ func (c *Client) Receive(ctx context.Context, code string, disableListener bool,
 		answer := &genericMessage{
 			Error: &errStr,
 		}
-		ctx := context.Background()
 
 		err = clientProto.WriteAppData(ctx, answer)
 		if err != nil {
