@@ -300,7 +300,7 @@ func (c *Client) sendFileDirectory(ctx context.Context, offer *offerMsg, r io.Re
 			return
 		}
 
-		err = transport.listenRelay()
+		err = transport.listenRelay(ctx)
 		if err != nil {
 			sendErr(err)
 			return
