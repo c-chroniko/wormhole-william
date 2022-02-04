@@ -253,9 +253,6 @@ func TestWormholeFileTransportSendRecvViaRelayServer(t *testing.T) {
 
 	url := rs.WebSocketURL()
 
-	testDisableLocalListener = true
-	defer func() { testDisableLocalListener = false }()
-
 	for relayProtocol, newRelayServer := range relayServerConstructors {
 		t.Run(fmt.Sprintf("With %s relay server", relayProtocol), func(t *testing.T) {
 			relayServer := newRelayServer()
@@ -277,12 +274,12 @@ func TestWormholeFileTransportSendRecvViaRelayServer(t *testing.T) {
 
 			buf := bytes.NewReader(fileContent)
 
-			code, resultCh, err := c0.SendFile(ctx, "file.txt", buf)
+			code, resultCh, err := c0.SendFile(ctx, "file.txt", buf, true)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			receiver, err := c1.Receive(ctx, code)
+			receiver, err := c1.Receive(ctx, code, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -312,9 +309,6 @@ func TestWormholeBigFileTransportSendRecvViaRelayServer(t *testing.T) {
 
 	url := rs.WebSocketURL()
 
-	testDisableLocalListener = true
-	defer func() { testDisableLocalListener = false }()
-
 	for relayProtocol, newRelayServer := range relayServerConstructors {
 		t.Run(fmt.Sprintf("With %s relay server", relayProtocol), func(t *testing.T) {
 			relayServer := newRelayServer()
@@ -342,13 +336,13 @@ func TestWormholeBigFileTransportSendRecvViaRelayServer(t *testing.T) {
 			r := bytes.NewReader(make([]byte, 1))
 
 			// skip th wrapper so we can provide our own offer
-			code, _, err := c0.sendFileDirectory(ctx, offer, r)
+			code, _, err := c0.sendFileDirectory(ctx, offer, r, true)
 			//c0.SendFile(ctx, "file.txt", buf)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			receiver, err := c1.Receive(ctx, code)
+			receiver, err := c1.Receive(ctx, code, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -367,9 +361,6 @@ func TestWormholeFileTransportRecvMidStreamCancel(t *testing.T) {
 	defer rs.Close()
 
 	url := rs.WebSocketURL()
-
-	testDisableLocalListener = true
-	defer func() { testDisableLocalListener = false }()
 
 	for relayProtocol, newRelayServer := range relayServerConstructors {
 		t.Run(fmt.Sprintf("With %s relay server", relayProtocol), func(t *testing.T) {
@@ -392,7 +383,7 @@ func TestWormholeFileTransportRecvMidStreamCancel(t *testing.T) {
 
 			buf := bytes.NewReader(fileContent)
 
-			code, resultCh, err := c0.SendFile(ctx, "file.txt", buf)
+			code, resultCh, err := c0.SendFile(ctx, "file.txt", buf, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -400,7 +391,7 @@ func TestWormholeFileTransportRecvMidStreamCancel(t *testing.T) {
 			childCtx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			receiver, err := c1.Receive(childCtx, code)
+			receiver, err := c1.Receive(childCtx, code, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -435,9 +426,6 @@ func TestWormholeFileTransportSendMidStreamCancel(t *testing.T) {
 
 	url := rs.WebSocketURL()
 
-	testDisableLocalListener = true
-	defer func() { testDisableLocalListener = false }()
-
 	for relayProtocol, newRelayServer := range relayServerConstructors {
 		t.Run(fmt.Sprintf("With %s relay server", relayProtocol), func(t *testing.T) {
 			relayServer := newRelayServer()
@@ -465,12 +453,12 @@ func TestWormholeFileTransportSendMidStreamCancel(t *testing.T) {
 				cancel:   cancel,
 			}
 
-			code, resultCh, err := c0.SendFile(sendCtx, "file.txt", &splitR)
+			code, resultCh, err := c0.SendFile(sendCtx, "file.txt", &splitR, true)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			receiver, err := c1.Receive(ctx, code)
+			receiver, err := c1.Receive(ctx, code, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -496,9 +484,6 @@ func TestPendingSendCancelable(t *testing.T) {
 
 	url := rs.WebSocketURL()
 
-	testDisableLocalListener = true
-	defer func() { testDisableLocalListener = false }()
-
 	for relayProtocol, newRelayServer := range relayServerConstructors {
 		t.Run(fmt.Sprintf("With %s relay server", relayProtocol), func(t *testing.T) {
 			relayServer := newRelayServer()
@@ -519,7 +504,7 @@ func TestPendingSendCancelable(t *testing.T) {
 			childCtx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			code, resultCh, err := c0.SendFile(childCtx, "file.txt", buf)
+			code, resultCh, err := c0.SendFile(childCtx, "file.txt", buf, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -576,9 +561,6 @@ func TestPendingRecvCancelable(t *testing.T) {
 
 	url := rs.WebSocketURL()
 
-	testDisableLocalListener = true
-	defer func() { testDisableLocalListener = false }()
-
 	for relayProtocol, newRelayServer := range relayServerConstructors {
 		t.Run(fmt.Sprintf("With %s relay server", relayProtocol), func(t *testing.T) {
 			relayServer := newRelayServer()
@@ -595,7 +577,7 @@ func TestPendingRecvCancelable(t *testing.T) {
 			code := "87-firetrap-fallacy"
 			resultCh := make(chan error, 1)
 			go func() {
-				_, err := c0.Receive(childCtx, code)
+				_, err := c0.Receive(childCtx, code, true)
 				resultCh <- err
 			}()
 
