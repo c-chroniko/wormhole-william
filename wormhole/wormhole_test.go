@@ -20,6 +20,8 @@ import (
 
 	"github.com/klauspost/compress/zip"
 	"github.com/psanford/wormhole-william/rendezvous/rendezvousservertest"
+	"github.com/psanford/wormhole-william/internal/crypto"
+	"github.com/psanford/wormhole-william/rendezvous"
 	"nhooyr.io/websocket"
 )
 
@@ -479,7 +481,7 @@ func TestWormholeFileTransportSendMidStreamCancel(t *testing.T) {
 func TestPendingSendCancelable(t *testing.T) {
 	ctx := context.Background()
 
-	rs := rendezvousservertest.NewServer()
+	rs := rendezvousservertest.NewServerLegacy()
 	defer rs.Close()
 
 	url := rs.WebSocketURL()
@@ -510,7 +512,7 @@ func TestPendingSendCancelable(t *testing.T) {
 			}
 
 			// connect to mailbox to wait for c0 to write its initial message
-			rc := rendezvous.NewClient(url, crypto.RandSideID(), c0.appID())
+			rc := rendezvous.NewClient(url, crypto.RandSideID(), c0.AppID)
 
 			_, err = rc.Connect(ctx)
 			if err != nil {
@@ -556,7 +558,7 @@ func TestPendingSendCancelable(t *testing.T) {
 func TestPendingRecvCancelable(t *testing.T) {
 	ctx := context.Background()
 
-	rs := rendezvousservertest.NewServer()
+	rs := rendezvousservertest.NewServerLegacy()
 	defer rs.Close()
 
 	url := rs.WebSocketURL()
@@ -583,7 +585,7 @@ func TestPendingRecvCancelable(t *testing.T) {
 
 			// wait to see mailbox has been allocated, and then
 			// wait to see PAKE message from receiver
-			rc := rendezvous.NewClient(url, crypto.RandSideID(), c0.appID())
+			rc := rendezvous.NewClient(url, crypto.RandSideID(), c0.AppID)
 
 			_, err := rc.Connect(ctx)
 			if err != nil {
@@ -749,7 +751,7 @@ func TestWormholeDirectoryTransportSendRecvDirect(t *testing.T) {
 func TestWormholeDirectoryTransportSendRecvRelay(t *testing.T) {
 	ctx := context.Background()
 
-	rs := rendezvousservertest.NewServer()
+	rs := rendezvousservertest.NewServerLegacy()
 	defer rs.Close()
 
 	url := rs.WebSocketURL()
@@ -802,12 +804,12 @@ func TestWormholeDirectoryTransportSendRecvRelay(t *testing.T) {
 				},
 			}
 
-			code, resultCh, err := c0.SendDirectory(ctx, "skyjacking", entries)
+			code, resultCh, err := c0.SendDirectory(ctx, "skyjacking", entries, true)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			receiver, err := c1.Receive(ctx, code)
+			receiver, err := c1.Receive(ctx, code, true)
 			if err != nil {
 				t.Fatal(err)
 			}

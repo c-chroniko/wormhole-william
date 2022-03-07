@@ -3,7 +3,6 @@
 package wasm
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -136,6 +135,10 @@ func (fileWrapper *FileWrapper) Read(p []byte) (n int, err error) {
 	start := fileWrapper.index
 	end := start + int64(len(p))
 
+	if end > fileWrapper.Size {
+		end = fileWrapper.Size
+	}
+
 	var (
 		bCh   = make(chan struct{}, 1)
 		errCh = make(chan error, 1)
@@ -150,6 +153,7 @@ func (fileWrapper *FileWrapper) Read(p []byte) (n int, err error) {
 		uint8Buf := uint8Array.New(arrayBuf)
 
 		n = js.CopyBytesToGo(p, uint8Buf)
+
 		bCh <- struct{}{}
 		return nil
 	})
@@ -172,7 +176,7 @@ func (fileWrapper *FileWrapper) Read(p []byte) (n int, err error) {
 
 	fileWrapper.index += int64(n)
 
-	return len(p), nil
+	return int(end - start), nil
 }
 
 func (fileWrapper *FileWrapper) Seek(offset int64, whence int) (int64, error) {
@@ -216,11 +220,12 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 		clientPtr := uintptr(args[0].Int())
 		fileName := args[1].String()
 
-		uint8Array := args[2]
-		size := uint8Array.Get("byteLength").Int()
-		fileData := make([]byte, size)
-		js.CopyBytesToGo(fileData, uint8Array)
-		fileReader := bytes.NewReader(fileData)
+		fileJSVal := args[2]
+		fileWrapper, err := NewFileWrapper(fileJSVal)
+		if err != nil {
+			reject(err)
+			return
+		}
 
 		err, client := getClient(clientPtr)
 		if err != nil {
@@ -233,7 +238,7 @@ func Client_SendFile(_ js.Value, args []js.Value) interface{} {
 			opts = collectTransferOptions(args[3])
 		}
 
-		code, resultChan, err := client.SendFile(ctx, fileName, fileReader, true, opts...)
+		code, resultChan, err := client.SendFile(ctx, fileName, fileWrapper, true, opts...)
 		if err != nil {
 			reject(err)
 			return
